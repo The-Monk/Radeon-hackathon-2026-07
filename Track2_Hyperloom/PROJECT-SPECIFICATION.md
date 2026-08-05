@@ -314,6 +314,23 @@ space from the model's own dimensions, sweeps `-np` under pinned clocks, detects
 throughput knee, caches the answer per `(model, context)`, and launches the server with
 that parallelism.
 
+**The agent does this itself.** `sweep_batch` is one of its tools, so serving configuration
+is discovered the same way kernel gaps are — by measurement, not assumption. Asked only
+*"I want to serve this model to several users at once; find the concurrency that maximises
+throughput, and tell me what it costs"*, with no tool named, it selected the sweep, chose
+its own grid, and reported:
+
+> *"The concurrency that maximizes aggregate throughput is 256 streams, yielding 2831.59
+> tokens/s. However, throughput per stream falls as concurrency rises, so at this maximum
+> concurrency the cost is approximately 11.06 tokens/s per request, down from 14.39 tokens/s
+> per stream at 192 streams."*
+
+That run independently reproduced the numbers in the table above to within ~1%. Note it
+volunteered the per-stream cost rather than quoting the aggregate alone — the tool grid is
+also clamped to llama.cpp's 1–256 range, because an out-of-range value aborts every point
+in the sweep, and pinned to a large KV budget so the measurement cannot manufacture the
+false cliff described below.
+
 ### Measured — Ternary-Bonsai-8B-Q2_0, gfx1201, `npp=32 ntg=128`
 
 | streams (`-np`) | decode throughput | vs single stream |

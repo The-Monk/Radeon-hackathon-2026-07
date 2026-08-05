@@ -35,6 +35,13 @@ TOOLS = [
    "Show which compute route a decode kernel dispatches to.",
    "parameters":{"type":"object","properties":{
      "name":{"type":"string","description":"kernel name, e.g. decode_dot8 or decode_dp4a"}},"required":["name"]}}},
+ {"type":"function","function":{"name":"sweep_batch","description":
+   "Measure the continuous-batching throughput curve for a model on this GPU: runs llama-batched-bench "
+   "across a grid of concurrent-stream counts and returns tokens/s for each. Use this to find the "
+   "serving parallelism that maximises throughput -- it is per-model and cannot be guessed.",
+   "parameters":{"type":"object","properties":{
+     "streams":{"type":"string","description":"comma-separated stream counts, e.g. '1,32,96,192'"}},
+     "required":["streams"]}}},
  {"type":"function","function":{"name":"run_bench","description":
    "Build and run a correctness-gated benchmark on the Radeon GPU and return its output.",
    "parameters":{"type":"object","properties":{
@@ -73,6 +80,25 @@ def do_tool(name, args):
     if name == "read_kernel":
         k = args.get("name", "decode_dot8")
         return sh(f"grep -nE 'sudot8|dp4a|blockIdx' kernels/decode/{k}.hip 2>/dev/null | head -4") or "(kernel not found)"
+    if name == "sweep_batch":
+        grid = (args.get("streams") or "1,32,96,192").strip()
+        # keep the grid inside llama.cpp's hard n_seq_max limit, or the whole run aborts
+        safe = ",".join(x for x in (g.strip() for g in grid.split(",")) if x.isdigit() and 1 <= int(x) <= 256)
+        if not safe:
+            return "no valid stream counts; llama.cpp allows 1..256 (n_seq_max)"
+        model = "/aipool/models/ternary-bonsai-phase0/Ternary-Bonsai-8B-Q2_0.gguf"
+        bin_ = "/ml/wcache-fix-build/bin/llama-batched-bench"
+        out = sh(f"HIP_VISIBLE_DEVICES=0 {bin_} -m {model} -c 131072 -b 2048 -ub 512 "
+                 f"-npp 32 -ntg 128 -npl {safe} -ngl 99 2>/dev/null | grep -E '^\\|' | tail -20", timeout=3600)
+        if not out:
+            return "sweep produced no rows (model or benchmark binary missing)"
+        lines = ["streams | decode t/s"]
+        for row in out.splitlines():
+            f = [c.strip() for c in row.split("|")]
+            if len(f) > 9 and f[3].isdigit():
+                lines.append(f"{f[3]:>7} | {f[8]}")
+        return "\n".join(lines) if len(lines) > 1 else out
+
     if name == "run_bench":
         if args.get("which") == "production":
             shape = args.get("shape", "")
@@ -104,7 +130,9 @@ SYSTEM = ("You are Hyperloom, an agent that optimises LLM inference kernels on A
           "You have tools and you use them: never state a hardware fact from memory when a tool can "
           "check it. Keep answers to 3 sentences. Refer back to what earlier turns established. "
           "If a bandwidth figure exceeds the card's 631 GB/s DRAM roofline, say so plainly — it means "
-          "the working set fit in the 64 MiB cache and the number is not a real throughput result.")
+          "the working set fit in the 64 MiB cache and the number is not a real throughput result. "
+          "When you sweep batching, report the curve and say where throughput stops improving. "
+          "Throughput per stream falls as concurrency rises: never call an aggregate figure a per-request speed-up.")
 
 def main():
     msgs = [{"role":"system","content":SYSTEM}]
