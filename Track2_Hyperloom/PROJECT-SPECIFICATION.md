@@ -377,3 +377,84 @@ Per-stream latency degrades across the range, as it must: each of the 256 stream
 about 11 t/s against 155 for a lone stream. The 192-stream point was re-measured as a
 control across two runs (2764.1 and 2780.4 t/s, 0.6% apart), so the curve is comparable
 run to run.
+
+## 10. The harness: an interface that cannot display an unverified claim
+
+`harness/serve.py` serves a local browser dashboard (127.0.0.1 only, no outbound
+request) that watches a real agent run: tool calls as they execute, correctness
+gates as they pass, measurements as they land. Run it with:
+
+    python3 harness/serve.py     # then open http://127.0.0.1:8770
+
+It is not a progress display. It enforces two rules that this project learned the
+hard way, and it enforces them in the rendering layer, where they cannot be
+forgotten:
+
+1. **A throughput number is UNVERIFIED until a gate naming that specific metric
+   has passed.** Not "some gate passed" — the gate must name the metric.
+2. **A bandwidth above the measured 631 GB/s DRAM roofline renders INVALID, not
+   green.** Above the roofline does not mean fast; it means the working set fit
+   in the 64 MiB Infinity Cache and the number is not a throughput result.
+
+A live run demonstrates the second rule firing on itself. The mission
+deliberately measures one cache-resident shape alongside two honest ones:
+
+    decode N=65536 K=4096     611 GB/s   ws=144.0 MiB    96.8%   ok
+    decode N=16384 K=14336    603 GB/s   ws=126.0 MiB    95.6%   ok
+    decode N=14336 K=4096     796 GB/s   ws= 31.5 MiB   126.1%   INVALID (cache-resident)
+
+The largest number on the page is the one rendered red. It passes its
+correctness gate — it is a *correct* number — but it is not a *valid* throughput
+claim. Keeping "correct" and "valid" as separate states is the entire point:
+this project twice published a number that was correct and invalid at the same
+time, and a human caught it both times. The interface now catches it.
+
+`dashboard.html` was drafted by the local model (Qwen-AgentWorld-35B-A3B on the
+Radeon card) from a written specification, and both interlocks were present in
+its first output. The per-metric gate linkage in rule 1 was underspecified by us
+and corrected by hand afterwards. `harness/README.md` records that split.
+
+## 11. A limit we found in our own routing, and did not fix
+
+The hipBLASLt prefill routes are gated on M (the batch dimension) against a
+scalar threshold, `MTHRESH`. We tested whether M alone is sufficient by running
+the same route, at the same M values, against two models of different width.
+
+| ubatch | 8B: OFF → ON | 24B: OFF → ON |
+|-------:|-------------------------|--------------------------|
+|  64 | 1965 → 2014  (**+2.5%**) | 810 → 501  (**-38.2%**) |
+| 128 | 2942 → 3223  (**+9.6%**) | 1074 → 833 (**-22.5%**) |
+| 256 | 4110 → 5457 (**+32.7%**) | 1320 → 1324  (+0.3%) |
+| 512 | 4077 → 5396 (+32.3%)     | 1381 → 1603 (+16.1%) |
+
+Same route, same threshold, opposite outcomes: **+32.7% on the 8B and -38.2% on
+the 24B**, both with tight error bars (±78/±6.5 and ±3.3/±1.1 respectively). The
+8B wins at every M we measured, so its crossover is below 64; the 24B is hurt
+badly until roughly 256. The crossover moves at least 4x with model shape.
+
+The conclusion is that the gate keys on the wrong variable. It tests M, while
+the algorithm cache underneath it is keyed on the full shape `(N, M, K, mode)` —
+which is the information the gate actually needs. This is why the routes ship
+**opt-in and env-gated rather than on by default**: a scalar threshold that is
+correct for one model is a 38% regression for another, and we would rather ship
+a conservative default than a fast one that is wrong off-box.
+
+We are reporting this rather than fixing it because the fix is a shape-aware
+gate that we have not measured, and an unmeasured fix is exactly the kind of
+claim the rest of this document exists to avoid. `benchmarks/crossover.sh`
+reproduces the table.
+
+## 12. Radeon Cloud escalation: built, not claimed
+
+`agent/escalation.py` implements confidence-gated escalation to the Radeon Cloud
+OpenAI-compatible API: a stuck-detector watches repeated local failures, and on
+a genuine stall it sends a *structured* packet (the layered context of what was
+tried and how it failed) rather than a bare retry. Core inference stays local on
+the Radeon GPU in every case; the cloud is a fallback for stalls, never the
+primary path.
+
+The code reads `RADEON_CLOUD_API_BASE` / `_KEY` / `_MODEL` and is ready to
+configure. **We are not claiming the optional bonus points.** We could not
+obtain credentials for the Token Factory endpoint before the deadline, so the
+path is untested against the live service, and we will not present an untested
+path as a working one.
