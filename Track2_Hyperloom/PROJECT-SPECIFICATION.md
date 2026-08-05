@@ -180,3 +180,41 @@ gfx1201) and AMD-AGI/Magpie **#70**.
 - **Not dependent on a closed-source agent platform.** The mission loop, tools, memory and
   escalation logic are in this repository (`agent/`).
 - **All tooling is ROCm-native** — hipcc, llvm-mc, rocprof/metrix, Magpie.
+
+---
+
+## 7. Where to find each thing the Track 2 criteria ask for
+
+This section exists so a reviewer can locate evidence directly rather than infer it.
+Every row names a file in this repository or a timestamp in the demo video.
+
+### 7.1 Minimum functional requirements (the track asks for at least 2 of 5)
+
+Hyperloom implements **four**.
+
+| Capability | Implemented | Where |
+|---|---|---|
+| **Local knowledge retrieval (RAG)** | Yes | `agent/optimizer-agent/memory.py` — `ingest_knowledge()` builds a corpus from documents the agent reads and from its own logs; `search_knowledge()` retrieves the most relevant chunks before it decides. Storage is plain JSONL under `memory/`, durable across runs and auditable. The corpus is not handed to the agent; it grows it. |
+| **Tool invocation** | Yes | `agent/optimizer-agent/agent.py` drives a tool-call loop. Toolkit in `toolkit/`: `scan-isa-gfx.sh` (ISA ground truth via `llvm-mc`), `disasm-gfx.sh` (verify emitted instructions), `profile-datapath-gfx.sh`, `magpie.sh`, plus `hipcc` builds and benchmark execution. **Demo video 0:25–1:24** shows the agent declining to answer a hardware question from memory and emitting a real `scan_isa` tool call instead. |
+| **Multi-step task planning** | Yes | The mission loop — DETECT → SCAN → FIND-GAPS → TUNE → FIX → VALIDATE → **AUDIT THE MEASUREMENT** — encoded in `skill/SKILL.md` and visible end to end in the demo video. Fault diagnosis is planned across seven layers (silicon → driver → runtime → compiler → kernel → format → serving) rather than guessed at. |
+| **Local multi-turn memory** | Yes | `memory.py` — `remember(note, tags)` / `recall(query)`. `agent.py:run_attempt()` starts each attempt with a fresh context while **memory persists on disk across attempts**, and a diagnosis step between attempts is seeded from what previous attempts recorded. That is what stops it re-exploring a path it already closed. |
+| Permission control & privacy | Partial | Private by construction: the agent's brain runs locally on the Radeon GPU and no core function calls a remote API. An escalation path exists (`agent/escalation.py`) and is deliberately gated — any external answer is treated as *assumed* until it passes a local correctness gate on the actual GPU. There is no separate permissions UI, so this is claimed as partial. |
+
+### 7.2 Evaluation criteria
+
+| Criterion | Evidence |
+|---|---|
+| **Task positioning & creative scenarios** | The agent operates in a domain where results cannot be faked: a kernel is either numerically correct and faster, or it is not. It targets the prosumer/workstation long tail, where vendor optimization arrives last — a new Radeon part ships, the kernel libraries lag it, and this closes the gap without waiting. |
+| **Core capabilities — task decomposition, tool invocation, RAG, memory** | All four present; see 7.1 for file-level locations. |
+| **Multi-turn interaction** | The interaction is agentic rather than conversational: repeated attempts against the same objective, each with a fresh context, with durable memory and a grounded diagnosis step between them (`agent.py:run_attempt`, `diagnose`). Stated plainly — this is a multi-turn *work* loop, not a chat interface. |
+| **Core inference on AMD Radeon GPU** | **Demo video 0:25–1:24**: the 35B tool-calling brain loads onto the card, Radeon VRAM goes from ~740 MB to ~27.7 GB, and the tool call is issued from it. Served locally by Lemonade. No remote API is involved in any core function. |
+| **Targeted optimization for inference speed** | Three measured, correctness-gated results across the inference stack — decode at 96–97% of the measured 631 GB/s DRAM roofline, prefill 3.67× via int4 2:4-sparse SWMMAC, and an INT6 compressed all-reduce for the dual-GPU path. Reproduction commands in `benchmarks/README.md`; the routing layer and its measured abstain threshold are shown in the video at **1:24–2:07**. |
+
+### 7.3 What this submission does not claim
+
+Stated because a claim a reviewer can disprove is worth less than one they can check.
+
+- There is **no chat UI**. The interaction model is an autonomous work loop.
+- Permission control is **partial** — private by construction, but without a dedicated permissions layer.
+- The Radeon **cloud** bonus is **not claimed**; core inference runs on local Radeon hardware.
+- The prefill routing layer is **opt-in and off by default**, and validation of the individual routes is ongoing. The three headline results above are measured on the default path and reproduce from a clean clone.
