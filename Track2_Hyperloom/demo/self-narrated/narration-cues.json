@@ -1,40 +1,8 @@
 {
-  "seg-intro": [
-    "AMD Radeon AI PRO R9700. G F X twelve-oh-one, RDNA four, thirty-two gigabytes.",
-    "Three results, all correctness-gated, all reproducible on this card.",
-    "decode int four GEMV at ninety-seven percent roofline. prefill SWMMAC. comms compressed all-reduce."
-  ],
-  "seg-launch": [
-    "Step A: brain not loaded. Used VRAM is thirty-one thousand two hundred ninety-two.",
-    "Step B: load agent brain onto Radeon. Loaded in two seconds.",
-    "Step C: model resident on GPU. Delta is agent brain in Radeon memory.",
-    "Step D: agent refuses to guess. Reaches for tool G F X twelve-oh-one.",
-    "Agent calls scan tool for G F X twelve-oh-one.",
-    "Assembler confirms the instruction is present. The i u four is four bit.",
-    "No cloud endpoint was contacted. Inference runs local on the AMD Radeon GPU."
-  ],
-  "seg-kernel": [
-    "The naive kernel uses one thread per row.",
-    "Adjacent lanes land two thousand forty eight bytes apart. That is uncoalesced.",
-    "Twenty eight M I B of int four weights fit inside the cache.",
-    "The fix uses one block per row. Threads stride along K.",
-    "Warning ignoring return value of type hipError_t declared with nodiscard attribute.",
-    "Warnings for hipFree and hipMalloc calls ignoring return values.",
-    "Twenty warnings generated when compiling for G F X twelve-oh-one."
-  ],
-  "demo-operation": [
-    "Step zero detect silicon. Name is G F X twelve-oh-one.",
-    "Scan ISA. Int four dot eight present. Dp four a int eight present.",
-    "Step two find the gap. Shipped kernel leaves the native path unused.",
-    "Fix build both routes. Validate measure instruction A slash B. Correctness pass.",
-    "Step six the real decode result. Production kernel with block per row.",
-    "One hundred twenty six percent of roofline. The harness flagging bad number.",
-    "Step seven prefill int four two colon four sparse swmmac correctness gated first.",
-    "Device zero AMD Radeon AI PRO R nine seven zero zero.",
-    "Step eight comms uses INT six compressed all-reduce for dual-GPU tensor-parallel path.",
-    "RCCL has no G F X twelve-oh-one tuning index.",
-    "We compress payload with INT six and shared scale for exact-integer reduce.",
-    "Accuracy tests show gaussian activations with block thirty-two and multiple bit sizes.",
-    "Exact reduce verdicts are exact for bits six, bits four, and bits eight."
+  "seg-route": [
+    "The agent builds a route per format and gates each one.",
+    "All routes are opt-in and soft-fail back to the stock path.",
+    "Below it the route stands down and the stock kernel runs.",
+    "If hipBLASLt cannot serve the shape, control returns to the unmodified kernel."
   ]
 }
