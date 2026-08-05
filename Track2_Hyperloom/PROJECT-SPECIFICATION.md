@@ -324,7 +324,10 @@ that parallelism.
 | 32 | 1333.8 t/s | 8.61× |
 | 48 | 1917.7 t/s | 12.39× |
 | 64 | 1859.6 t/s | 12.01× |
-| **96** | **2489.3 t/s** | **16.07×** |
+| 96 | 2503.8 t/s | 16.17× |
+| 128 | 2481.3 t/s | 16.02× |
+| 160 | 2683.5 t/s | 17.33× |
+| **192** | **2764.1 t/s** | **17.85×** |
 
 **Read this correctly: it is aggregate throughput, not per-request speed.** One stream
 generates ~155 tokens/s; ninety-six streams together generate ~2489, which is ~26 t/s
@@ -333,8 +336,19 @@ serving several concurrent tasks — the case this track is about — throughput
 figure that matters, but it should never be quoted as though a single reply got 16×
 faster.
 
-**Why the sweep is not optional.** Throughput at 64 streams (1859.6) is *lower* than at
-48 (1917.7), then recovers by 96. The curve is not monotonic, so a guessed `-np` can land
-in a trough — and the trough moves with the model: the same script picks `-np 16` for
-Ternary-Bonsai-27B at 4096 context per slot, where VRAM binds long before throughput
-does. Measuring is the only way to get this right per model.
+**Why the sweep is not optional — including when it misleads you.** The curve is not
+monotonic: 64 streams (1859.6) is *slower* than 48 (1917.7) before recovering. A guessed
+`-np` can land in that trough. And the trough moves with the model — the same script picks
+`-np 16` for Ternary-Bonsai-27B at 4096 context per slot, where VRAM binds long before
+throughput does.
+
+It also caught an error in our own earlier work. A previous sweep concluded there was a
+throughput *cliff* at 128 streams and treated 96 as the peak. Re-running with a larger KV
+budget (`-c 65536` rather than `32768`) shows no cliff at all: 128 is flat within run-to-run
+variance, and throughput keeps climbing to **17.85× at 192 streams**. The original "cliff"
+was the context budget binding, not the hardware — a limit of the measurement, read as a
+property of the GPU.
+
+We did not test beyond 192, so the true ceiling is unknown; 17.85× is a floor, not a peak.
+Per-stream latency degrades as expected across the range — at 192 streams each sees about
+14 t/s against 155 for a lone stream.
