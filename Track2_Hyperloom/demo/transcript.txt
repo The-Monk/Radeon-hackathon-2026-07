@@ -1,0 +1,40 @@
+
+════════════════════════════════════════════════════════════
+  STEP 0 — DETECT the silicon
+════════════════════════════════════════════════════════════
+    Name:                    gfx1201                            
+  (gfx target)
+
+════════════════════════════════════════════════════════════
+  STEP 1 — SCAN the ISA (llvm-mc ground truth — the assembler can't lie)
+════════════════════════════════════════════════════════════
+  Is the native 8-wide int4 dot present on this part?
+    v_dot8_i32_iu4   (int4 dot8)             PRESENT
+    v_dot4_i32_iu8   (dp4a int8)             PRESENT
+
+════════════════════════════════════════════════════════════
+  STEP 2 — FIND THE GAP
+════════════════════════════════════════════════════════════
+  The int4 decode GEMV computes 8 int4 values with the dp4a route:
+    unpack int4 -> int8, then 2x v_dot4_i32_iu8  (2 dot instrs / 8 values)
+  But the silicon has v_dot8_i32_iu4: 8 int4 values in ONE instruction.
+  => the kernel is leaving the native path on the table. That's the gap.
+
+════════════════════════════════════════════════════════════
+  STEP 3 — FIX: build both routes and prove which instruction each emits
+════════════════════════════════════════════════════════════
+  built: decode_dp4a (dp4a route) + decode_dot8 (native v_dot8_iu4)
+
+════════════════════════════════════════════════════════════
+  STEP 4 — VALIDATE + MEASURE on the R9700 (correctness-gated vs CPU int reference)
+════════════════════════════════════════════════════════════
+  [dp4a  unpack->v_dot4_i32_iu8] N=14336 K=4096  correctness=PASS  time=0.25025 ms  weight-BW=117.3 GB/s
+  [dot8_iu4  v_dot8_i32_iu4] N=14336 K=4096  correctness=PASS  time=0.17033 ms  weight-BW=172.4 GB/s
+
+════════════════════════════════════════════════════════════
+  RESULT
+════════════════════════════════════════════════════════════
+  Both bit-exact vs the CPU reference (correctness=PASS).
+  Native v_dot8_iu4 int4 decode beats the dp4a route ~1.49x — measured, on-box.
+  Hyperloom found the gap by scanning the silicon, fixed it, and proved the win.
+
