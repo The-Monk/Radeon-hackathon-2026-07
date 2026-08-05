@@ -327,7 +327,8 @@ that parallelism.
 | 96 | 2503.8 t/s | 16.17× |
 | 128 | 2481.3 t/s | 16.02× |
 | 160 | 2683.5 t/s | 17.33× |
-| **192** | **2764.1 t/s** | **17.85×** |
+| 192 | 2780.4 t/s | 17.95× |
+| **256** | **2853.1 t/s** | **18.42×** |
 
 **Read this correctly: it is aggregate throughput, not per-request speed.** One stream
 generates ~155 tokens/s; ninety-six streams together generate ~2489, which is ~26 t/s
@@ -349,6 +350,13 @@ variance, and throughput keeps climbing to **17.85× at 192 streams**. The origi
 was the context budget binding, not the hardware — a limit of the measurement, read as a
 property of the GPU.
 
-We did not test beyond 192, so the true ceiling is unknown; 17.85× is a floor, not a peak.
-Per-stream latency degrades as expected across the range — at 192 streams each sees about
-14 t/s against 155 for a lone stream.
+**The GPU never saturated — llama.cpp ran out first.** 256 concurrent sequences is a hard
+limit in the runtime (`n_seq_max must be <= 256`); asking for 320 fails at context creation.
+Throughput was still rising into that ceiling: +2.6% from 192 to 256, flattening but not
+flat. So 18.42× is a **floor imposed by the serving framework, not a property of the
+silicon** — this card has concurrency headroom that llama.cpp cannot currently address.
+
+Per-stream latency degrades across the range, as it must: each of the 256 streams sees
+about 11 t/s against 155 for a lone stream. The 192-stream point was re-measured as a
+control across two runs (2764.1 and 2780.4 t/s, 0.6% apart), so the curve is comparable
+run to run.
