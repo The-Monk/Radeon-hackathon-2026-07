@@ -38,6 +38,7 @@ SEGMENTS = {
     "seg-kernel":     ("/tmp/txc-explain.txt",     62,  7),
     "demo-operation": ("/tmp/txc-demo-paced.txt", 118, 13),
     "seg-route":      ("/tmp/txc-route.txt",       40,  4),
+    "seg-chat":       ("/tmp/txc-chat.txt",        65,  6),
 }
 CHUNK = 4
 

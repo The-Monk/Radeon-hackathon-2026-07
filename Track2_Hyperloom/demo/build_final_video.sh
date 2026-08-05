@@ -18,7 +18,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SEG="$HERE/self-narrated"
 OUT="${1:-$SEG/HYPERLOOM-track2-demo.mp4}"
-ORDER=(seg-intro seg-launch seg-route seg-kernel demo-operation)
+ORDER=(seg-intro seg-launch seg-route seg-chat demo-operation)
 
 # prefer narrated; fall back to silent sped versions so a dry run still works
 list="$SEG/.concat-list.txt"; : > "$list"

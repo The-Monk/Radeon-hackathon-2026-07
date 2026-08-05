@@ -1,2 +1,5 @@
 file '/home/jmonk/rocky-hackathon/demo/self-narrated/seg-intro-narrated.mp4'
 file '/home/jmonk/rocky-hackathon/demo/self-narrated/seg-launch-narrated.mp4'
+file '/home/jmonk/rocky-hackathon/demo/self-narrated/seg-route-narrated.mp4'
+file '/home/jmonk/rocky-hackathon/demo/self-narrated/seg-chat-narrated.mp4'
+file '/home/jmonk/rocky-hackathon/demo/self-narrated/demo-operation-narrated.mp4'
