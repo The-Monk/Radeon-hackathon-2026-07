@@ -105,7 +105,8 @@ See `DESIGN.md` for the two-shot NUMA-aware structure and the GPU-window benchma
 
 ---
 
-## PACKAGING (pre-submission checklist)
-- [ ] Bundle `swmmac24_iu4_k64.cuh` (+ its `swmmac24.cuh` deps) into `kernels/prefill/` so the GEMM bench builds with no external tree. (Currently references the roc9 fork.)
-- [ ] Pin exact ROCm/hipcc versions in this README.
-- [ ] Record the demo (see `../demo/`).
+## Packaging notes
+
+The SWMMAC layout headers (`swmmac24_iu4_k64.cuh`, `swmmac24.cuh`) are bundled in
+`kernels/prefill/`, so the GEMM benchmark builds with no external tree. Validated on
+ROCm 7.x with `hipcc` targeting `gfx1201`.

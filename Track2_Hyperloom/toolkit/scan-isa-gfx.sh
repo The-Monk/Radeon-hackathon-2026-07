@@ -9,7 +9,7 @@
 # Usage: scan-isa-gfx.sh [gfx1201]   -> prints a capability map; redirect to save.
 set -euo pipefail
 ARCH="${1:-gfx1201}"
-SDK="${ROCM_PATH:-/home/jmonk/miniconda3/envs/qat714/lib/python3.12/site-packages/_rocm_sdk_devel}"
+SDK="${ROCM_PATH:-/opt/rocm}"
 MC="$SDK/lib/llvm/bin/llvm-mc"; [ -x "$MC" ] || MC="$(command -v llvm-mc)"
 
 probe(){ # $1 = asm line -> PRESENT / ABSENT

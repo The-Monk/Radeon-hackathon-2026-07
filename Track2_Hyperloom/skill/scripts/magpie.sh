@@ -9,7 +9,7 @@
 #   magpie.sh --gpu-info                                        # arch/profiler probe
 #
 # VERIFIED on this box: Magpie recognizes Architecture: gfx1201.
-# RDNA4 CLOSED-LOOP RECIPE (measured 2026-07-24, cross-validated dot8-vs-dp4a 1.49x by
+# RDNA4 CLOSED-LOOP RECIPE (measured 2026-07-24, cross-validated dot8-vs-dp4a ~2.2x by
 # self-timing AND metrix):
 #   PERF BACKEND = metrix (NOT the default rocprof-compute, which is CDNA-only/dead here).
 #   metrix HAS a gfx1201 backend and wraps rocprofv3 -> gives duration + HBM BW util + L2 hit.

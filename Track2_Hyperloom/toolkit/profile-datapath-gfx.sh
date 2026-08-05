@@ -16,7 +16,7 @@
 #  * Trustworthy per-kernel TIME at high dispatch density: trace a FEW kernel types via
 #    `--pmc ... --kernel-include-regex '<union>'`. Full --kernel-trace at 1000+ kernels inflates ~4-6x.
 #
-RP="${ROCPROFV3:-/home/jmonk/miniconda3/envs/qat714/lib/python3.12/site-packages/_rocm_sdk_devel/bin/rocprofv3}"
+RP="${ROCPROFV3:-/opt/rocm/bin/rocprofv3}"
 [ -x "$RP" ] || RP="$(command -v rocprofv3)"   # last resort; prefer the SDK binary above
 # --- UNLOCK THE MEMORY COUNTERS: flip the compute GPU to STABLE_STD (profile_standard), restore on exit.
 # Without this, GL2C_*/FETCH_SIZE/TA_*/SQ_INSTS_VALU read 0. Auto-detects the lowest-BDF amdgpu card

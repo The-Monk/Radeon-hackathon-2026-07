@@ -27,7 +27,7 @@ scripts/magpie.sh compare -k compare.yaml --baseline 0   # compile + correctness
 metrix profile --profile quick -- ./decode_dp4a | grep -oE 'avg=[0-9.]+'
 metrix profile --profile quick -- ./decode_dot8 | grep -oE 'avg=[0-9.]+'
 ```
-Result (MEASURED, bit-exact vs CPU ref): dp4a 250 µs vs dot8 168 µs → **native `v_dot8_i32_iu4` wins 1.49×** for int4 decode.
+Result (MEASURED, bit-exact vs CPU ref): dp4a 83 µs vs dot8 38 µs → **native `v_dot8_i32_iu4` wins ~2.2×** for int4 decode.
 
 ## 3. Verify a kernel emits the instruction you think (don't assert)
 ```

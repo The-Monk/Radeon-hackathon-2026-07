@@ -10,7 +10,7 @@ set -uo pipefail
 BUILD="${1:?usage: unused-isa-sweep.sh <build_dir> [arch]}"
 ARCH="${2:-gfx1201}"
 CC="$BUILD/compile_commands.json"
-SDK="${ROCM_PATH:-/home/jmonk/miniconda3/envs/qat714/lib/python3.12/site-packages/_rocm_sdk_devel}"
+SDK="${ROCM_PATH:-/opt/rocm}"
 OBJD="$SDK/lib/llvm/bin/llvm-objdump"
 OUT="$(mktemp -d)"; SDIR="$OUT/s"; mkdir -p "$SDIR"
 

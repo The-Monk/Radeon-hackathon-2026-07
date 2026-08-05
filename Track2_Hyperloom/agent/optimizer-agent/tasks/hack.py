@@ -1,3 +1,4 @@
+import os
 """
 Task plugin: HACK — open-ended, autonomous inference optimization.
 
@@ -100,7 +101,7 @@ TOOLS = [
 REPO   = os.environ.get("HACK_REPO", "/home/jmonk/src/mainline-llama.cpp-mxfp8")
 BIN    = os.environ.get("HACK_BIN",  "build-roc8-714/bin")
 CORPUS = os.environ.get("HACK_CORPUS", "/home/jmonk/src/mainline-llama.cpp-mxfp8/wikitext-2-raw/wiki.test.raw")
-LOG    = "/home/jmonk/optimizer-agent-hack.status"
+LOG    = os.environ.get("HYPERLOOM_HACK_LOG", os.path.join(os.path.dirname(os.path.abspath(__file__)), "hack.status"))
 NGEN   = "96"
 
 # the candidate inventory the agent discovers. FORK = our custom kernels/quants (fp8/ternary/DFlash);

@@ -44,6 +44,12 @@ RESEARCH_TOOLS = [
 ]
 
 def research_execute(fn, args):
+    # Hyperloom runs fully offline by default. These are the only outbound calls in the
+    # agent, they are never part of core inference, and they are opt-in so that a default
+    # run makes no network requests at all.
+    if os.environ.get("HYPERLOOM_ALLOW_WEB") != "1":
+        return ("Web access is disabled. Hyperloom runs fully offline by default; "
+                "set HYPERLOOM_ALLOW_WEB=1 to allow outbound lookups.")
     a = args or {}
     try:
         if fn == "web_search":

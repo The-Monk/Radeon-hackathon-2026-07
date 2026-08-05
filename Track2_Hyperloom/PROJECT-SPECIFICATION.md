@@ -64,7 +64,7 @@ effort arrives last. An agent that can do this work unattended turns "wait for t
         ┌──────────────────────────┼───────────────────────────┐
         ▼                          ▼                           ▼
   ┌───────────┐            ┌──────────────┐            ┌──────────────┐
-  │  TOOLS    │            │   MEMORY     │            │  ESCALATION  │
+  │  TOOLS    │            │   MEMORY     │            │ ESCALATION*  │
   │ scan-isa  │            │ persists     │            │ stuck-detect │
   │ disasm    │            │ across       │            │ → structured │
   │ hipcc     │            │ attempts,    │            │   packet     │
@@ -75,7 +75,12 @@ effort arrives last. An agent that can do this work unattended turns "wait for t
                                                        └──────────────┘
 ```
 
-**The escalation path is deliberately shaped.** When the agent is stuck (N correctness-gated
+\* **The escalation path is designed but not wired in.** `agent/escalation.py` exists and its
+stuck-detector and packet-builder are unit-tested offline, but nothing in the agent loop calls it
+and no cloud endpoint is configured. It is shown here because it is the intended shape, not
+because it runs today.
+
+**Why it is shaped that way.** When the agent is stuck (N correctness-gated
 failures, degenerate looping, or explicit self-report), it builds a *structured* packet — which
 isolation layer, verbatim evidence, what was already tried — and asks for help. The answer is
 treated as **assumed until it passes a local correctness gate on the actual Radeon GPU**. Core
@@ -119,8 +124,11 @@ gfx1201 is where it is proven.
 
 ## 4. Model and local deployment plan
 
-**Brain.** A tool-calling model served locally by **Lemonade** on `:13305`, pinned to one card so
-it fits in 32 GB VRAM. The agent talks to it over an OpenAI-compatible endpoint at
+**Brain.** `Qwen-AgentWorld-35B-A3B` (35B total, ~3B active per token — a mixture-of-experts
+model), quantized to **Q4_K_XL GGUF**, ~20.8 GB on disk and ~27 GB resident in VRAM once loaded.
+Served locally by **Lemonade** on `:13305`, pinned to one card so it fits in 32 GB. It is chosen
+for reliable tool-calling rather than raw size: an earlier 35B dense candidate failed the same
+agentic fixture this model passed. The agent talks to it over an OpenAI-compatible endpoint at
 `http://localhost:13305/v1`. Swapping the brain is a config change (`LEMONADE_URL`, model name),
 not a code change.
 
@@ -140,7 +148,7 @@ hipcc --version
 cd kernels/decode && hipcc --offload-arch=gfx1201 -O3 decode_mmvq_iu4.hip -o d && ./d
 ```
 
-Full environment configuration, startup guide and dependency list are in `README.md`;
+Full environment configuration, startup guide and dependency list are in `README.md` (section "Environment configuration, startup, and dependencies");
 per-claim reproduction commands are in `benchmarks/README.md`. A container build
 (`container/Containerfile`) is provided for a pinned toolchain.
 
@@ -198,7 +206,7 @@ Hyperloom implements **four**.
 | **Tool invocation** | Yes | `agent/optimizer-agent/agent.py` drives a tool-call loop. Toolkit in `toolkit/`: `scan-isa-gfx.sh` (ISA ground truth via `llvm-mc`), `disasm-gfx.sh` (verify emitted instructions), `profile-datapath-gfx.sh`, `magpie.sh`, plus `hipcc` builds and benchmark execution. **Demo video 0:25–1:24** shows the agent declining to answer a hardware question from memory and emitting a real `scan_isa` tool call instead. |
 | **Multi-step task planning** | Yes | The mission loop — DETECT → SCAN → FIND-GAPS → TUNE → FIX → VALIDATE → **AUDIT THE MEASUREMENT** — encoded in `skill/SKILL.md` and visible end to end in the demo video. Fault diagnosis is planned across seven layers (silicon → driver → runtime → compiler → kernel → format → serving) rather than guessed at. |
 | **Local multi-turn memory** | Yes | `memory.py` — `remember(note, tags)` / `recall(query)`. `agent.py:run_attempt()` starts each attempt with a fresh context while **memory persists on disk across attempts**, and a diagnosis step between attempts is seeded from what previous attempts recorded. That is what stops it re-exploring a path it already closed. |
-| Permission control & privacy | Partial | Private by construction: the agent's brain runs locally on the Radeon GPU and no core function calls a remote API. An escalation path exists (`agent/escalation.py`) and is deliberately gated — any external answer is treated as *assumed* until it passes a local correctness gate on the actual GPU. There is no separate permissions UI, so this is claimed as partial. |
+| Permission control & privacy | Partial | Private by construction: the agent's brain runs locally on the Radeon GPU, and **no inference — core or otherwise — leaves the machine**. The agent does carry optional `web_search` / `web_fetch` lookup tools; they are **disabled by default** and require `HYPERLOOM_ALLOW_WEB=1`, so a default run makes no outbound request at all. An escalation path exists (`agent/escalation.py`) and is deliberately gated — any external answer is treated as *assumed* until it passes a local correctness gate on the actual GPU. There is no separate permissions UI, so this is claimed as partial. |
 
 ### 7.2 Evaluation criteria
 
@@ -206,7 +214,7 @@ Hyperloom implements **four**.
 |---|---|
 | **Task positioning & creative scenarios** | The agent operates in a domain where results cannot be faked: a kernel is either numerically correct and faster, or it is not. It targets the prosumer/workstation long tail, where vendor optimization arrives last — a new Radeon part ships, the kernel libraries lag it, and this closes the gap without waiting. |
 | **Core capabilities — task decomposition, tool invocation, RAG, memory** | All four present; see 7.1 for file-level locations. |
-| **Multi-turn interaction** | The interaction is agentic rather than conversational: repeated attempts against the same objective, each with a fresh context, with durable memory and a grounded diagnosis step between them (`agent.py:run_attempt`, `diagnose`). Stated plainly — this is a multi-turn *work* loop, not a chat interface. |
+| **Multi-turn interaction** | Demonstrated directly in the demo video: a four-turn conversation in one context, where the agent calls tools, is corrected by one of them, and refers back to what earlier turns established. Underneath, the same loop runs unattended: repeated attempts against the same objective, each with a fresh context, with durable memory and a grounded diagnosis step between them (`agent.py:run_attempt`, `diagnose`). Stated plainly — this is a multi-turn *work* loop, not a chat interface. |
 | **Core inference on AMD Radeon GPU** | **Demo video 0:25–1:24**: the 35B tool-calling brain loads onto the card, Radeon VRAM goes from ~740 MB to ~27.7 GB, and the tool call is issued from it. Served locally by Lemonade. No remote API is involved in any core function. |
 | **Targeted optimization for inference speed** | Three measured, correctness-gated results across the inference stack — decode at 96–97% of the measured 631 GB/s DRAM roofline, prefill 3.67× via int4 2:4-sparse SWMMAC, and an INT6 compressed all-reduce for the dual-GPU path. Reproduction commands in `benchmarks/README.md`; the routing layer and its measured abstain threshold are shown in the video at **1:24–2:07**. |
 
@@ -214,7 +222,80 @@ Hyperloom implements **four**.
 
 Stated because a claim a reviewer can disprove is worth less than one they can check.
 
-- There is **no chat UI**. The interaction model is an autonomous work loop.
+- There is **no graphical chat UI**. Interaction is conversational but terminal-based — see the multi-turn session in the demo video — and the agent also runs as an unattended work loop.
 - Permission control is **partial** — private by construction, but without a dedicated permissions layer.
-- The Radeon **cloud** bonus is **not claimed**; core inference runs on local Radeon hardware.
+- The Radeon **cloud** bonus is **not claimed**. `agent/escalation.py` was written against that bonus and its docstring still says so, but the module is not wired into the agent loop and no cloud endpoint is configured; core inference runs entirely on local Radeon hardware.
 - The prefill routing layer is **opt-in and off by default**, and validation of the individual routes is ongoing. The three headline results above are measured on the default path and reproduce from a clean clone.
+
+---
+
+## 8. The kernel work itself, and how it was validated
+
+The three results in §5 are not one-off benchmarks. They live in a working fork of
+llama.cpp targeting gfx1201, on a branch (`roc8`) that carries the shipping kernels,
+the routing layer, and the test harness used to gate them. This section describes what
+is in it and — more importantly — how it was checked, because the checking is where
+most of the engineering went.
+
+### 8.1 What is on the branch
+
+| Area | Work |
+|---|---|
+| **Decode** | `k_mmvq_dot8_iu4` — native `v_dot8_i32_iu4`, one block per row, coalesced K-stride, shared-memory reduction |
+| **Prefill routing** | Per-format hipBLASLt routes for Q1_0, Q2_0, Q4_K, Q8_0, F8E4M3, MXFP8, MXFP6, IU4, F16 — each opt-in, each soft-failing back to the stock kernel, each gated on a measured M threshold |
+| **Comms** | INT6 inline-compressed all-reduce for the dual-GPU tensor-parallel path |
+| **Sparsity** | int4 2:4-sparse SWMMAC GEMM (`v_swmmac_i32_16x16x64_iu4`) |
+
+### 8.2 Two defects found by validation, not by use
+
+Both were invisible to the testing that existed before, and each is a lesson about
+what a given test can and cannot see.
+
+**A Q4_K decode kernel that produced garbage.** A micro-optimisation replaced a
+per-thread activation sum with the block sum that `q8_1` already stores. Those are not
+the same quantity at that call site: each thread owns a quarter of the block, so all
+four threads added the whole block's sum and the min term came out **4× too large**.
+Every Q4_K model generated garbage at decode — `"The capital of France is"` produced
+`|  Term???????????????`.
+
+It had passed validation because the validation was perplexity, and
+`llama-perplexity` runs at `n_batch=512`, so every matmul goes through the `mmq` path
+and the broken `mmvq` decode path is **never executed**. The measurement was structurally
+incapable of seeing the bug. Fix: revert the hunk; `test-backend-ops -o MUL_MAT` goes
+from 1113 OK / 28 q4_K FAIL to **1143 OK / 0 FAIL**, and the model says `Paris.`
+
+**A weight cache that returned another model's weights.** Every hipBLASLt route cached
+converted weights keyed on the weight tensor's device address, with no invalidation
+anywhere. Once a buffer was freed, a later allocation at the same address hit a stale
+entry. It never fires in single-model single-process use — which is exactly what
+perplexity and ordinary generation exercise — but it fires on multi-model benchmarks and
+on server model swaps. Fix: the routes register an invalidator and the CUDA backend calls
+it on buffer teardown, so the cost is zero on the hot path. Q8_0 int8 with the cache
+enabled goes from **35 OK / 12 FAIL to 46 OK / 0 FAIL**; the same for Q1_0 and IU4.
+
+### 8.3 How claims are gated
+
+- **A clean-tree build gate.** `verify-roc8-promotion.sh` builds the branch from a git
+  worktree containing committed content only, then runs `test-backend-ops`. This exists
+  because a local build can quietly compile untracked files that no clean clone has —
+  which had already happened once.
+- **Correctness before throughput, always.** Every kernel checks itself against a CPU
+  reference and exits non-zero if it fails, before printing a single timing.
+- **Measurement audited against a measured roofline.** Working-set size is printed
+  beside every bandwidth figure, and a reading above the DRAM roofline is reported as
+  cache-residency rather than as a result.
+- **Independent adversarial review.** Both defects above were found by a review whose
+  brief was to *refute* the existing conclusions rather than confirm them. One of them
+  overturned a hypothesis the author was confident in.
+
+### 8.4 What is not claimed
+
+The prefill routes are **opt-in and off by default**, and validation of the individual
+routes is ongoing. A full sweep across all nine found real problems that are not yet
+fixed: the F16 route is a net regression at production shapes, the Q8_0 fp8 mode fails
+its own correctness tolerance in production configuration, and two routes alter generated
+text while having no coverage in `test-backend-ops` at all.
+
+So the branch ships them disabled. The three headline results in §5 are measured on the
+**default** path and reproduce from a clean clone; the routing layer is presented as work
+in progress, because that is what it is.

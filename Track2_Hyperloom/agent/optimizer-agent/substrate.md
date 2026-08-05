@@ -40,7 +40,7 @@ Results produced on this hardware, correctness-gated bit-exact against a CPU ref
 
 | Lever | Result | How |
 |---|---|---|
-| `v_dot8_i32_iu4` int4 decode | **1.49×** vs the dp4a route (0.17 ms vs 0.25 ms, N=14336×K=4096) | native 8-wide int4 dot; bit-exact vs CPU |
+| `v_dot8_i32_iu4` int4 decode | **~2.2×** vs the dp4a route (0.038 ms vs 0.083 ms, N=14336×K=4096) | native 8-wide int4 dot; bit-exact vs CPU |
 | `v_swmmac_i32_16x16x64_iu4` (K64 2:4 sparse) | **3.90×** kernel ceiling / **3.67×** full GEMM | wide-tile SWMMAC on RDNA4 |
 | hipBLASLt int8 prefill (Q2_0) | **+15.6%** pp1024 | self-tuning per-shape algo cache |
 | native fp8 (E4M3/E5M2) | weights + KV + MoE kernel, on-device | RDNA4 fp8 WMMA path |

@@ -25,7 +25,8 @@ BRAIN_CARD = os.environ.get("BRAIN_CARD", "1")   # brain served here (lemonade p
 TEST_CARD  = os.environ.get("TEST_CARD",  "0")   # benchmarks run here, isolated
 MAX_STEPS    = int(os.environ.get("MAX_STEPS", "40"))
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "0"))   # outer loop: 0 = UNLIMITED, retry until success
-THINK_LOG    = os.environ.get("THINK_LOG", "/home/jmonk/optimizer-agent-thinking.log")
+THINK_LOG    = os.environ.get("THINK_LOG",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "thinking.log"))
 
 
 def _trim(messages):
@@ -158,7 +159,7 @@ def run_attempt(task, tools, sys_content, attempt):
             print(f"[a{attempt} s{step}] LOOP-BREAKER: forcing off '{fn0}'")
             messages.append({"role": "user", "content":
                 f"STOP. You have called '{fn0}' with the same arguments 3+ times with no progress — you "
-                "are looping. Do NOT make that call again. Do something DIFFERENT right now: web_search "
+                "are looping. Do NOT make that call again. Do something DIFFERENT right now: re-read the "
                 "then web_fetch the thing you're stuck on, OR edit_source and rebuild, OR move to the next "
                 "model. Also remember() what you've learned so you don't repeat it."})
             for s in spiraled: sig_counts[s] = 0

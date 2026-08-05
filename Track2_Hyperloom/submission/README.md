@@ -10,14 +10,14 @@ Every requirement from the Track 2 submission spec, and where it lives.
 |---|---|---|
 | 1 | **Project Specification Document** — application scenarios · agent architecture diagram · core capabilities · model introduction & local deployment plan · optimization description for inference speed on AMD Radeon GPU | [`PROJECT-SPECIFICATION.md`](../PROJECT-SPECIFICATION.md) |
 | 2 | **Project Source Code** — complete repository, README with environment configuration, startup guide, dependency list | [repo root](../) · [`README.md`](../README.md) · [`benchmarks/README.md`](../benchmarks/README.md) · [`container/`](../container/) |
-| 3 | **Demo Video** — actual operation process, command line → final result, on an AMD Radeon GPU | [`demo/self-narrated/demo-operation.mp4`](../demo/self-narrated/demo-operation.mp4) — 3 min 30 s, 1920×1080 |
+| 3 | **Demo Video** — actual operation process, command line → final result, on an AMD Radeon GPU | [`demo/self-narrated/HYPERLOOM-track2-demo.mp4`](../demo/self-narrated/HYPERLOOM-track2-demo.mp4) — 4 min 53 s, 1920×1080, with narration |
 | 4 | **Supplementary Material** (choose one) — PPT / Poster | [`submission/poster.pdf`](poster.pdf) (A2, single page) · [`poster.png`](poster.png) |
 
 ---
 
 ## About the demo video
 
-`demo-operation.mp4` is a **genuine screen capture of the system running**, not a rendered
+`HYPERLOOM-track2-demo.mp4` is a **genuine screen capture of the system running**, not a rendered
 animation or a replay of stored text. It records `demo/run_demo.sh` executing live against the
 R9700 — every command shown being typed is the command that runs, and every number on screen is
 produced on the card during the recording.

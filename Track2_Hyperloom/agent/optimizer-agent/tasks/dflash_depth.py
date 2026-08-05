@@ -1,3 +1,4 @@
+import os
 """
 Task plugin: find the DFlash draft depth that maximizes decode throughput on this RDNA4 box.
 
@@ -56,7 +57,7 @@ TOOLS = [
 ]
 
 # --- real benchmark implementations (run on the TEST card, isolated) ---------------------------
-REPO   = "/home/jmonk/src/mainline-llama.cpp-mxfp8"
+REPO   = os.environ.get("HYPERLOOM_REPO", "/home/jmonk/src/mainline-llama.cpp-mxfp8")
 TARGET = "/aipool/models/qwen3.6-27b-bf16-mtp/Qwen3.6-27B-F8E4M3.gguf"
 DRAFT  = "/aipool/models/qwen3.6-27b-dflash-draft-f8e4m3.gguf"
 NGEN   = "64"                       # bounded so the agent loop iterates quickly

@@ -20,7 +20,7 @@ Every ML-relevant matrix/dot/convert instruction on the Radeon AI PRO R9700 (gfx
 | `v_swmmac_f32_16x16x32_f16` | ✅ | 2 · 2of4_f16 | — | — | dormant |
 | `v_swmmac_i32_16x16x64_iu4` | ✅ | **5** · mul_mat_2of4_iu4_k64 (was **0** — gap CLOSED this session) | 1345→1551 TOPS (ILP1→≥4) | 100–101% of 1531 | the unexploited find, now covered; full-GEMM realizes **3.67×** |
 | **Dot (decode / GEMV)** | | | | | |
-| `v_dot8_i32_iu4` (int4 dot8) | ✅ | 4 · mmvq_iu4 | microbench 1.49× vs dp4a | — | model-realized 1.1–1.34× (bandwidth-bound) |
+| `v_dot8_i32_iu4` (int4 dot8) | ✅ | 4 · mmvq_iu4 | microbench ~2.2x vs dp4a | — | model-realized 1.1–1.34× (bandwidth-bound) |
 | `v_dot4_i32_iu8` (dp4a) | ✅ | 8,624 · mmvq/fattn-vec | — | — | production decode |
 | `v_dot4_f32_fp8` | ✅ | 110 · mmvq | — | — | fp8 dot |
 | `v_dot2_f32_f16` | ✅ | 125,666 · fattn-tile | — | — | attention decode |

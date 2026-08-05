@@ -19,7 +19,7 @@ ARCH="${2:-gfx1201}"
 RE="${3:-v_wmma|v_swmmac|v_dot[0-9]|v_dual|v_pk_|v_fma|global_load_b|ds_[a-z]+_b|s_endpgm}"
 
 # Resolve the SDK toolchain (TheRock 7.14 pip SDK in qat714, or system ROCm).
-SDK="${ROCM_PATH:-/home/jmonk/miniconda3/envs/qat714/lib/python3.12/site-packages/_rocm_sdk_devel}"
+SDK="${ROCM_PATH:-/opt/rocm}"
 HIPCC="$SDK/bin/hipcc"; [ -x "$HIPCC" ] || HIPCC="$(command -v hipcc)"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT

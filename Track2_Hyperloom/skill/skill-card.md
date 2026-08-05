@@ -18,7 +18,7 @@ Working. A reference implementation of the "autonomously optimizes LLM inference
 
 ## Validated results (MEASURED on gfx1201, correctness-gated)
 
-- **int4 decode lever** — native `v_dot8_i32_iu4` GEMV = **1.49×** vs the dp4a route (unpack→`v_dot4_i32_iu8`), bit-exact vs CPU reference.
+- **int4 decode lever** — native `v_dot8_i32_iu4` GEMV = **~2.2×** vs the dp4a route (unpack→`v_dot4_i32_iu8`), bit-exact vs CPU reference.
 - **int4 2:4 sparse SWMMAC** — native `v_swmmac_i32_16x16x64_iu4` raw-instruction ceiling = **3.90×** vs int8 WMMA / 1.95× vs int4 dense WMMA (8-way ILP; residual ~2.7% is a real fixed sparsity-decode cost, not schedulable).
 - **Full ISA audit** — of ~19 present ML instructions on gfx1201, 17 exploited; the 2 gaps (`v_swmmac_i32_16x16x64_iu4` int4-sparse, `v_dot2_f32_bf16`) surfaced by an assembler-ground-truth sweep and given correctness-proven (err=0) coverage.
 - **Perf-level counter unlock** — the GL2C/FETCH_SIZE "broken counters read 0" myth on RDNA3/4 root-caused to a perf-level gate (STABLE_STD), not firmware.

@@ -6,7 +6,7 @@
 
 | Instruction | Microbench (isolated) | Model-realized | Realization tweak | Evidence |
 |---|---|---|---|---|
-| `v_dot8_i32_iu4` (int4 dot8) | **1.49×** vs dp4a-route, bit-exact — but **29% HBM util = instruction-bound**, so the microbench *overstates* the decode win | **1.10–1.34×** vs dp4a in the real `mmvq_iu4` decode kernel (K=4096→14336) | wire `vec_dot_iu4` into `mmvq` gated M=1; decode is bandwidth-bound so the *byte-width* is the real lever, not the instruction | decode microbench (this session) + T170 |
+| `v_dot8_i32_iu4` (int4 dot8) | **~2.2×** vs dp4a-route, bit-exact — but **29% HBM util = instruction-bound**, so the microbench *overstates* the decode win | **1.10–1.34×** vs dp4a in the real `mmvq_iu4` decode kernel (K=4096→14336) | wire `vec_dot_iu4` into `mmvq` gated M=1; decode is bandwidth-bound so the *byte-width* is the real lever, not the instruction | decode microbench (this session) + T170 |
 | `v_dot4_i32_iu8` (dp4a) | 7376 emissions, production baseline | served models (coherent) | — (baseline) | ISA sweep + served |
 | `v_dot2_f32_f16` | 125,666 emissions (flash-attn) | served, all attention decode | — | ISA sweep |
 

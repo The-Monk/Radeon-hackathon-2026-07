@@ -1,6 +1,6 @@
 # Hyperloom — an autonomous ROCm kernel-optimizer agent for AMD Radeon
 
-**AMD AI DevMaster Hackathon · Track 2: Agentic AI**
+**AMD AI DevMaster Hackathon · Track 2: Development & Local Deployment of Private AI Agents**
 
 Hyperloom is an AI agent that makes AMD Radeon GPUs faster at LLM inference — on its own. Point it at a Radeon GPU and it detects the exact silicon, maps the real instruction-set capability with the assembler (not marketing claims), builds a measured roofline, finds where kernels leave performance on the table, and **writes and tunes correctness-gated HIP kernels** to close the gap. It reasons across the whole stack — silicon → driver → runtime → compiler → kernel → format → serving — and isolates a fault at its *real* layer instead of guessing.
 
@@ -16,9 +16,9 @@ Every number is reproduced from source in `benchmarks/`, on real gfx1201 hardwar
 
 ---
 
-## Why this fits "Agentic AI"
+## Why this fits Track 2
 
-The track asks for **intelligent agents with reasoning and planning**. Hyperloom is exactly that, applied to a hard, verifiable domain where you can't fake the result — a kernel is either numerically correct and faster, or it isn't.
+The track asks for a **fully locally deployed, customizable AI agent with toolchain invocation capabilities**. Hyperloom is exactly that, applied to a hard, verifiable domain where you can't fake the result — a kernel is either numerically correct and faster, or it isn't.
 
 **The agent's method (encoded in `skill/SKILL.md`):**
 
@@ -53,3 +53,76 @@ demo/          Watch the agent optimize a kernel end-to-end, live
 Hardware: an AMD Radeon GPU on ROCm (validated on Radeon AI PRO R9700, gfx1201). See `benchmarks/README.md` for one-command reproductions. Every kernel correctness-gates against a CPU reference and prints its own throughput; the ISA claims are verified by disassembly, not assertion.
 
 *Built on 2× Radeon AI PRO R9700 (gfx1201) + ROCm. Every optimization measured, correctness-gated, and — where it matters — shippable.*
+
+---
+
+## Environment configuration, startup, and dependencies
+
+Track 2 asks for these explicitly, so they are here rather than scattered.
+
+### Hardware and platform
+
+| | |
+|---|---|
+| GPU | AMD Radeon, RDNA4 / `gfx1201` — validated on Radeon AI PRO R9700 (32 GB) |
+| Stack | ROCm 7.x with `hipcc`; `llvm-mc` from the same toolchain for the ISA probe |
+| OS | Linux (validated on Ubuntu-family, kernel 6.17+) |
+| Disk | ~25 GB for the agent model, plus ~10 GB for test models |
+
+Other RDNA/CDNA targets are detected by `agent/optimizer-agent/hardware.py`, but only
+`gfx1201` is validated here.
+
+### 1. Dependencies
+
+```bash
+# system
+sudo apt install -y build-essential cmake git python3 python3-pip ffmpeg
+# ROCm 7.x — follow AMD's installer for your distro, then confirm:
+hipcc --version && rocminfo | grep -m1 gfx
+
+# python (the agent has no heavyweight deps: stdlib + urllib only)
+pip install -r agent/optimizer-agent/requirements.txt
+```
+
+### 2. Start the local model server
+
+The agent's brain runs on your Radeon GPU via **Lemonade**
+(https://lemonade-server.ai). Install it, start it, then load the model:
+
+```bash
+lemonade-server serve                       # listens on :13305
+curl -X POST http://localhost:13305/api/v1/load \
+     -H 'Content-Type: application/json' \
+     -d '{"model_name":"agentworld"}'       # Qwen-AgentWorld-35B-A3B, ~27 GB VRAM
+curl -s http://localhost:13305/api/v1/health   # expect: "model_loaded": "agentworld"
+```
+
+Any OpenAI-compatible server works — point `LEMONADE_URL` elsewhere if you prefer
+vLLM or llama-server. The agent only needs `/v1/chat/completions` with tool-calling.
+
+### 3. Run it
+
+```bash
+# a multi-turn conversation with the agent (tools execute for real)
+python3 demo/chat_session.py
+
+# the full optimization workflow, end to end on the card
+./demo/run_demo.sh
+
+# reproduce any individual performance claim
+cd kernels/decode
+hipcc --offload-arch=gfx1201 -O3 decode_mmvq_iu4.hip -o decode_mmvq_iu4
+HIP_VISIBLE_DEVICES=0 ./decode_mmvq_iu4
+```
+
+Set `HIP_VISIBLE_DEVICES` to a GPU that is not driving your display. Do **not** set
+`ROCR_VISIBLE_DEVICES` — it silently forces CPU fallback.
+
+### 4. Network behaviour
+
+Hyperloom runs **fully offline by default**. Inference never leaves the machine. The
+agent carries optional `web_search` / `web_fetch` lookup tools which are disabled
+unless you set `HYPERLOOM_ALLOW_WEB=1`; with that unset, a run makes no outbound
+request at all.
+
+Per-claim reproduction commands are in [`benchmarks/README.md`](benchmarks/README.md).

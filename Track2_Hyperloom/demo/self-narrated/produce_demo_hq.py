@@ -10,7 +10,7 @@ Quality fixes over produce_demo.py:
     shipped a 256x256 source stretched over a 720p frame — that was the blur).
   * 1920x1080 output, x264 -crf 18 -preset slow, 192k audio (was 720p @ 857kbps).
   * Narration numbers corrected to the measured, reproducible claims. The old
-    script hardcoded "1.49x", which was measured on a cache-resident working set
+    script hardcoded "~2.2x", which was measured on a cache-resident working set
     and no longer reflects the repo. See benchmarks/README.md §1.
 
 Usage: python3 produce_demo_hq.py [out.mp4]

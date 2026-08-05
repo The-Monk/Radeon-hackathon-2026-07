@@ -53,7 +53,8 @@ step "STEP 4 — VALIDATE + MEASURE the instruction A/B (bit-exact vs CPU refere
 run "HIP_VISIBLE_DEVICES=0 ./decode_dp4a"
 run "HIP_VISIBLE_DEVICES=0 ./decode_dot8"
 echo
-echo "  Native dot8 wins this A/B by ~2.2x. Both bit-exact. Most demos stop here."
+echo "  Both bit-exact. Compare the two times printed above — that ratio is the"
+echo "  instruction-level result, whatever it came out as on this run. Most demos stop here."
 
 step "STEP 5 — NOW CHECK THE MEASUREMENT (this is where speedup claims die)"
 echo "  That A/B holds the memory path constant, so it answers ONE question:"
