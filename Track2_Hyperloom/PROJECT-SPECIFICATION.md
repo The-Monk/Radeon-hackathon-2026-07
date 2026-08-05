@@ -299,3 +299,42 @@ text while having no coverage in `test-backend-ops` at all.
 So the branch ships them disabled. The three headline results in §5 are measured on the
 **default** path and reproduce from a clean clone; the routing layer is presented as work
 in progress, because that is what it is.
+
+---
+
+## 9. Serving throughput: auto-tuned continuous batching
+
+Kernel work raises the ceiling for one stream. Most of the value of a locally-deployed
+agent, though, shows up when several requests are in flight — and there the lever is
+continuous batching, whose optimal parallelism is **per-model, VRAM-coupled, and not
+monotonic**. So Hyperloom measures it rather than picking a number.
+
+`scripts/auto-batch-serve.sh` (in the llama.cpp fork) computes the KV-bounded search
+space from the model's own dimensions, sweeps `-np` under pinned clocks, detects the
+throughput knee, caches the answer per `(model, context)`, and launches the server with
+that parallelism.
+
+### Measured — Ternary-Bonsai-8B-Q2_0, gfx1201, `npp=32 ntg=128`
+
+| streams (`-np`) | decode throughput | vs single stream |
+|---|---|---|
+| 1 | 154.9 t/s | 1.00× |
+| 8 | 509.3 t/s | 3.29× |
+| 16 | 889.9 t/s | 5.75× |
+| 32 | 1333.8 t/s | 8.61× |
+| 48 | 1917.7 t/s | 12.39× |
+| 64 | 1859.6 t/s | 12.01× |
+| **96** | **2489.3 t/s** | **16.07×** |
+
+**Read this correctly: it is aggregate throughput, not per-request speed.** One stream
+generates ~155 tokens/s; ninety-six streams together generate ~2489, which is ~26 t/s
+each. Batching buys you *total work done*, and it costs per-request latency. For an agent
+serving several concurrent tasks — the case this track is about — throughput is the
+figure that matters, but it should never be quoted as though a single reply got 16×
+faster.
+
+**Why the sweep is not optional.** Throughput at 64 streams (1859.6) is *lower* than at
+48 (1917.7), then recovers by 96. The curve is not monotonic, so a guessed `-np` can land
+in a trough — and the trough moves with the model: the same script picks `-np 16` for
+Ternary-Bonsai-27B at 4096 context per slot, where VRAM binds long before throughput
+does. Measuring is the only way to get this right per model.
