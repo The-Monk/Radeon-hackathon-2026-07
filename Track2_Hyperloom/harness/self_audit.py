@@ -82,7 +82,7 @@ def grep(pattern):
         return f"(grep error: {e})"
 
 def ask(msgs):
-    body = {"model":BRAIN,"messages":msgs,"tools":TOOLS,"temperature":0.1,"max_tokens":2000}
+    body = {"model":BRAIN,"messages":msgs,"tools":TOOLS,"temperature":0.1,"max_tokens":24000}
     req = urllib.request.Request(URL, data=json.dumps(body).encode(),
                                  headers={"Content-Type":"application/json"})
     return json.loads(urllib.request.urlopen(req, timeout=900).read())["choices"][0]["message"]
@@ -91,7 +91,9 @@ def audit_one(claim):
     msgs = [{"role":"system","content":SYSTEM},
             {"role":"user","content":f"Claim to audit:\n\n{claim}"}]
     cited = []
-    for _ in range(4):
+    # 4 rounds was too few: the model was still investigating when we cut it off,
+    # and we recorded that as a NO-VERDICT failure. It answers correctly with room.
+    for _ in range(10):
         m = ask(msgs)
         msgs.append({k:v for k,v in m.items() if k in ("role","content","tool_calls")})
         tcs = m.get("tool_calls") or []
