@@ -718,6 +718,51 @@ budget and one prompt. It is evidence, not a law. We would expect a larger
 budget or a stronger model to eventually produce a working gate — the finding is
 that it is *much harder* than producing the kernel, not that it is impossible.
 
+## 10h. The same protocol across four quantisation formats
+
+`kernels/decode/agent_repro/quant/` generalises the fp8 rig. The model receives a
+written specification of a block layout and its decode rule; the harness owns the
+inputs, the golden reference and the verdict. Each rig is self-tested in both
+directions before the model sees it — a known-good kernel must reproduce, and a
+deliberately broken one must fail.
+
+| format | encoding | verdict | max abs err | normalised | time |
+|---|---|---|---|---|---|
+| **Q1_0** | 1-bit binary, {-1,+1} | REPRODUCED | 0 | **0** | 122s |
+| **Q2_0** | 2-bit ternary, {-1,0,+1} | REPRODUCED | 7.15e-07 | **1.08e-06** | 148s |
+| **Q4_0** | 4-bit linear, nibble-8 | REPRODUCED | 1.43e-06 | **1.04e-06** | 76s |
+| **Q8_0** | 8-bit signed | REPRODUCED | 0 | **0** | 72s |
+
+Q1_0 and Q8_0 are bit-exact. Q2_0 and Q4_0 differ only in fp32 rounding, because
+the model chose a different summation order than the reference — which is a
+legitimate implementation choice, not an error.
+
+**Getting that last sentence right required fixing our own metric, and it is the
+more useful finding.** Q4_0 first scored `8.47e-03` against a `1e-2` tolerance —
+85% of the way to failing. Investigating rather than accepting the pass showed
+the kernel's decode was exactly correct, and that the number came from a single
+row where `|golden| = 4.9e-05`, twenty-eight thousand times below the mean, while
+its absolute error was `4.2e-07` — right at the average for every other row. A
+per-row relative metric divides by that near-zero and manufactures an alarming
+number from ordinary rounding.
+
+The gate now measures `max|a-b| / mean|golden|` — the worst absolute disagreement
+against the scale of the result, which is what "these agree" means for a GEMV.
+The per-row relative figure is still printed, because it is informative; it just
+must not be the thing that decides. Under the corrected metric Q4_0 is
+`1.04e-06`, indistinguishable from the two bit-exact results.
+
+Had we not looked, a correct kernel would have been recorded as marginal, and a
+slightly unluckier seed would have failed it outright. **A tolerance that passes
+is not evidence that the metric is sound.**
+
+Formats not yet covered: Q5_0, the K-quant superblock family (Q3_K/Q4_K/Q5_K/Q6_K,
+256 elements with multi-level scales), the MX formats (E8M0 shared exponent), and
+2:4 structured sparsity — which needs a different rig entirely, since it is a
+SWMMAC prefill path with metadata rather than a decode GEMV. The rig extends in
+roughly twenty lines per linear format; the superblock and sparse families need
+real specification work rather than a copy.
+
 ## 11. A limit we found in our own routing, and did not fix
 
 The hipBLASLt prefill routes are gated on M (the batch dimension) against a
