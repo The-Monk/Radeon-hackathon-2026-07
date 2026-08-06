@@ -25,7 +25,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 PORT = int(os.environ.get("HARNESS_PORT", "8770"))
-ROOFLINE = 631.0          # measured streaming DRAM bandwidth, GB/s
+ROOFLINE = float(os.environ.get("ROOFLINE_GBS", "631.0"))
+# 631 GB/s is this machine (R9700 / gfx1201 / discrete GDDR6). It is a property of
+# the hardware, not a constant -- a Strix Halo APU on unified memory is nearer 256.
+# Set ROOFLINE_GBS on another box, or every honest result renders INVALID.
 
 STAGES = ["DETECT", "SCAN", "FIND_GAP", "WRITE", "GATE", "MEASURE", "AUDIT"]
 state = {"stage": None, "stages": STAGES, "tools": [], "gates": [], "metrics": [],

@@ -31,7 +31,12 @@ struct block_iu4 { __half d; uint8_t qs[QK_IU4/2]; };   // 2 + 16 = 18 bytes
 
 // Measured streaming DRAM roofline for this board (RVS babel + bw_roofline.cu,
 // cross-checked 2026-08-03: 598-635 GB/s depending on access mix).
-static const double ROOFLINE_GBS = 631.0;
+static double ROOFLINE_GBS = 631.0;
+// 631 GB/s is THIS machine (R9700, gfx1201, discrete GDDR6). The roofline is a
+// property of the box, not a constant: a Strix Halo APU on unified LPDDR5X is
+// nearer 256 GB/s, and grading against 631 there would flag every good result
+// INVALID. Override with ROOFLINE_GBS=<n> in the environment, and measure it
+// on the target rather than trusting a spec sheet.
 
 // ---- verbatim committed kernel -------------------------------------------
 static __global__ void k_mmvq_dot8_iu4(
@@ -74,7 +79,16 @@ static void cpu_ref(const std::vector<block_iu4>& W, const std::vector<block_iu4
     }
 }
 
+static void roofline_from_env(void) {
+    const char* e = getenv("ROOFLINE_GBS");
+    if (e && atof(e) > 0.0) {
+        ROOFLINE_GBS = atof(e);
+        printf("  roofline overridden from environment: %.1f GB/s\n", ROOFLINE_GBS);
+    }
+}
+
 int main(int argc, char** argv) {
+    roofline_from_env();
     // Default shapes are DRAM-honest on a 64 MiB-Infinity-Cache board.
     // Override: ./decode_mmvq_iu4 N K
     std::vector<std::pair<int,int>> shapes = {{65536,4096},{16384,14336}};

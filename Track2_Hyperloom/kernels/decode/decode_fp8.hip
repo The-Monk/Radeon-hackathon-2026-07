@@ -36,7 +36,12 @@
 #include <random>
 
 #define QK 32
-static const double ROOFLINE_GBS = 631.0;   // measured streaming DRAM read, GB/s
+static double ROOFLINE_GBS = 631.0;   // measured streaming DRAM read, GB/s
+// 631 GB/s is THIS machine (R9700, gfx1201, discrete GDDR6). The roofline is a
+// property of the box, not a constant: a Strix Halo APU on unified LPDDR5X is
+// nearer 256 GB/s, and grading against 631 there would flag every good result
+// INVALID. Override with ROOFLINE_GBS=<n> in the environment, and measure it
+// on the target rather than trusting a spec sheet.
 static const double CACHE_MIB    = 64.0;    // Infinity Cache
 
 struct block_f8e4m3 { __half  d;  uint8_t qs[QK]; };
@@ -173,8 +178,17 @@ static double run(int N, int K, bool timed, double* out_gbs, double* out_mib)
     return max_rel;
 }
 
+static void roofline_from_env(void) {
+    const char* e = getenv("ROOFLINE_GBS");
+    if (e && atof(e) > 0.0) {
+        ROOFLINE_GBS = atof(e);
+        printf("  roofline overridden from environment: %.1f GB/s\n", ROOFLINE_GBS);
+    }
+}
+
 int main(int argc, char** argv)
 {
+    roofline_from_env();
     printf("=== fp8 E4M3 decode via v_dot4_f32_fp8_fp8 (gfx1201) ===\n\n");
 
     // ---- 1. correctness gate, before any timing is printed ----------------
@@ -205,7 +219,10 @@ int main(int argc, char** argv)
                N, K, mib,
                cache_resident ? "(CACHE-RESIDENT!)" : "(DRAM-honest)",
                gbs, 100.0 * gbs / ROOFLINE_GBS,
-               gbs > ROOFLINE_GBS ? "  <-- INVALID: above roofline, measuring cache" : "");
+               gbs > ROOFLINE_GBS
+                 ? (cache_resident ? "  <-- INVALID: above roofline, working set fits cache"
+                                   : "  <-- INVALID: above roofline, cause unknown -- check the roofline value")
+                 : "");
     }
     return 0;
 }

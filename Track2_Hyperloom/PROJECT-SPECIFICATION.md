@@ -455,6 +455,27 @@ cross the line into "above roofline", but a claim of exactly *100%* would be an
 artefact of denominator choice, which is why the tables say 96-100% and the
 INVALID flag triggers on the working set rather than on a percentage.
 
+### Running this on different silicon
+
+`ROOFLINE_GBS` is an environment variable, not a constant, in both the kernels and
+the harness. 631 GB/s is *this* machine — a discrete R9700 on GDDR6. A Strix Halo
+APU (gfx1151) on unified LPDDR5X is nearer 256 GB/s, and grading against 631 there
+would mark every honest result INVALID. Measure the roofline on the target and pass
+it in.
+
+Making that overridable surfaced a bug worth recording: the kernels printed
+"above roofline, measuring cache" for *any* over-roofline reading, so a wrong
+roofline produced a confident and wrong explanation — a 272 MiB working set
+labelled cache-resident. They now name the cache only when the working set
+actually fits in it, and otherwise say the cause is unknown and point at the
+roofline value. The same conflation existed in the dashboard and is fixed there
+too.
+
+Note also that `decode_fp8.hip` will not compile for gfx1151 or gfx1100 at all:
+`v_dot4_f32_fp8_fp8` is RDNA4. That is the correct outcome, not a portability
+failure — the ISA probe in `toolkit/` is the part that is meant to run anywhere,
+and it reports what a given target actually has.
+
 ## 10b. fp8: the gate that should have been there from the start
 
 `kernels/decode/decode_fp8.hip` is the fp8 (E4M3) decode kernel, built on
