@@ -670,6 +670,54 @@ citations across eight adversarial questions when the harness owned the check.
 That is the finding this project is built on, stated three ways: **this model is
 reliable exactly where something else is checking it.**
 
+## 10g. The model can write the kernel. It could not write the checker.
+
+Having shown the model can produce a bit-exact kernel from a specification
+(§10f), the obvious next question is whether it can produce the thing that
+*checks* a kernel. If it could, the harness argument this document rests on
+would be much weaker.
+
+`kernels/decode/agent_repro/run_agent_harness.py` runs that test. The model is
+asked to write a complete correctness gate: a CPU reference for fp8 E4M3, a
+comparison against GPU output, and a PASS/FAIL verdict. Its harness is then
+compiled against five kernels whose correct verdicts we already know — one
+correct implementation and four broken in specific ways (writes a constant,
+drops the per-block scales, processes half the blocks, swaps the scale
+factors).
+
+| kernel | its harness said | correct verdict |
+|---|---|---|
+| **good** | FAIL | **PASS** |
+| constant | FAIL | FAIL |
+| noscale | FAIL | FAIL |
+| halfrow | FAIL | FAIL |
+| swapped | FAIL | FAIL |
+
+**It rejected everything, including the correct kernel**, and did not converge
+across three rounds of feedback. A gate that fails everything carries exactly as
+much information as one that passes everything: none. It catches all four bugs
+only in the sense that a broken thermometer reads cold in a fire.
+
+Placed beside the other two results in this document, the picture is consistent:
+
+| Task | Who owned the verdict | Outcome |
+|---|---|---|
+| Write the fp8 kernel from a spec | the harness | **bit-exact, first attempt** |
+| Audit eight claims with a grep tool | the harness | **7/8, zero fabricated citations** |
+| Write the correctness gate itself | *the model* | **failed, 3 attempts** |
+| Evaluate its own fp8 work (earlier bake-off) | *the model* | **claimed 28x against a broken baseline** |
+
+The model does the work well and judges it badly. Every result here where
+something else owned the judgement came out sound; every result where the model
+owned it came out wrong. That is the entire reason this project is built around
+harnesses, and it is the reason we do not propose replacing the harness with a
+second model.
+
+One honest caveat: this is a single model, one task family, a three-attempt
+budget and one prompt. It is evidence, not a law. We would expect a larger
+budget or a stronger model to eventually produce a working gate — the finding is
+that it is *much harder* than producing the kernel, not that it is impossible.
+
 ## 11. A limit we found in our own routing, and did not fix
 
 The hipBLASLt prefill routes are gated on M (the batch dimension) against a
