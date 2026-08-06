@@ -242,7 +242,7 @@ most of the engineering went.
 | Area | Work |
 |---|---|
 | **Decode** | `k_mmvq_dot8_iu4` — native `v_dot8_i32_iu4`, one block per row, coalesced K-stride, shared-memory reduction |
-| **Prefill routing** | Per-format hipBLASLt routes for Q1_0, Q2_0, Q4_K, Q8_0, F8E4M3, MXFP8, MXFP6, IU4, F16 — each opt-in, each soft-failing back to the stock kernel, each gated on a measured M threshold. **These routes live in our llama.cpp fork, not in this repository**; what is reproducible here are the standalone kernels under `kernels/`. |
+| **Prefill routing** | Per-format hipBLASLt routes for Q1_0, Q2_0, Q4_K, Q8_0, F8E4M3, MXFP8, MXFP6, IU4, F16 — each opt-in, each soft-failing back to the stock kernel, each gated on a measured M threshold. These routes live in our llama.cpp fork, **public at [The-Monk/llama.cpp, branch `roc8`](https://github.com/The-Monk/llama.cpp/tree/roc8)**; what is reproducible *here* are the standalone kernels under `kernels/`. |
 | **Comms** | INT6 inline-compressed all-reduce for the dual-GPU tensor-parallel path |
 | **Sparsity** | int4 2:4-sparse SWMMAC GEMM (`v_swmmac_i32_16x16x64_iu4`) |
 
@@ -440,6 +440,26 @@ and the correctness check runs *before* any throughput line is printed — if it
 fails the program exits without reporting a number. The measured result turned
 out to be sound. That was luck, not method, and the method is what we are
 submitting.
+
+## 10c. The fork, if you want to read the full kernel work
+
+The prefill routes, the int4 decode path, the fp8 kernels and the 2:4-sparse
+SWMMAC work are integrated in our llama.cpp fork rather than in this repository,
+because they only mean anything inside a real inference engine:
+
+  **https://github.com/The-Monk/llama.cpp** — branch **`roc8`**
+
+It is a fork of [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
+(MIT, © the ggml authors), and its README says so; all credit for llama.cpp
+belongs upstream. None of this is upstreamed and none of it carries any
+endorsement from the llama.cpp maintainers.
+
+Two things there are worth more than the speedups. The first is a plain
+correctness fix: `GGML_TYPE_Q2_0` was missing from `ggml_validate_row_data`,
+which silently broke `llama-quantize --type Q2_0` and `--check-tensors` for
+every Q2_0 GGUF. We audited the rest of the table; Q2_0 was the only gap. The
+second is that **every added route is opt-in and env-gated, defaulting to the
+stock kernel** — for the reason measured in §11.
 
 ## 11. A limit we found in our own routing, and did not fix
 
