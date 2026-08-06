@@ -557,6 +557,46 @@ reviewer following a `roc9` path in an output file will not find that branch —
 use `roc8`, which contains the same commits. We have left the captured output
 unedited rather than rewriting recorded filenames after the fact.
 
+## 10e. We pointed the agent at our own submission
+
+Three external reviewers audited this document and found real defects. The
+obvious question is why the agent we are submitting did not do that job, so we
+ran it: `harness/self_audit.py`.
+
+Eight claims, six of them defects the reviewers found and we verified by hand,
+two genuinely backed as controls. The agent gets **one** tool — grep over this
+repository. The harness owns everything else: the claim list, the ground truth,
+and the scoring. Critically, every `file:line` the model cites is checked against
+the grep output it actually received, so **inventing evidence is detected
+separately from being wrong**.
+
+| | |
+|---|---|
+| Correct verdicts | **7 / 8** |
+| Real defects caught | **4 / 4** |
+| False alarms | **0 / 4** |
+| **Fabricated citations** | **0** |
+| Failed to answer | 1 |
+
+The single miss was a non-answer, not a wrong answer: on the crossover claim it
+never emitted a parseable verdict. It caught the Magpie issue-versus-fix error,
+the 90.5-versus-91.6 discrepancy, the "unexploited instruction" claim its own
+repository contradicts, and the serving section with no artifact.
+
+**The first scoring run said 6/8 and was wrong — our fault, not the model's.**
+One claim's ground truth was stale: we had already fixed `serve.py` before the
+experiment ran, so the model correctly answered BACKED against the tree in front
+of it and we marked it WRONG against a defect that no longer existed. A harness
+that owns the reference is only as good as that reference, and ours was briefly
+out of date. The note is preserved in the script.
+
+What we take from this is narrower than "the agent can audit." It is that under a
+harness which owns the reference and mechanically checks citations, this model
+produced **zero fabricated evidence** across eight adversarial questions. That is
+consistent with our earlier finding that the difference between useful and
+useless agent output is the harness rather than the model — this is the same
+result observed from the positive direction.
+
 ## 11. A limit we found in our own routing, and did not fix
 
 The hipBLASLt prefill routes are gated on M (the batch dimension) against a
