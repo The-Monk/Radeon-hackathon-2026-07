@@ -606,31 +606,51 @@ result observed from the positive direction.
 
 ## 10f. Who wrote the kernels
 
-Worth stating plainly, because the surrounding text describes an agent with a
-mission loop that ends in FIX and VALIDATE, and a reader could reasonably infer
-more than we are claiming.
+The kernels shipped in `kernels/` were written by a human. That needs saying,
+because the surrounding text describes an agent whose mission loop ends in FIX
+and VALIDATE, and the demo narration says "the kernels it writes".
 
-**The kernels in `kernels/` were written by a human**, with AI assistance of the
-ordinary kind. They were not autonomously produced by the local agent in this
-repository. What the agent genuinely does, and what the video shows, is the
-*investigative* half of that loop: detect the hardware, census the ISA with
-`llvm-mc`, locate a gap, run a correctness-gated benchmark, and refuse a number
-that fails its gate.
+So we tested whether that narration is defensible, under conditions where it
+could not be faked. `kernels/decode/agent_repro/` contains the rig:
 
-We are specific about this because we have measured the difference. In an earlier
-bake-off we asked this model to produce and evaluate fp8 kernel work
-autonomously. Its raw execution was sound — it built and ran things correctly —
-but **every performance verdict failed independent audit**, six runs, a different
-way each time. The fp8 attempt reported a 28x speedup against a baseline that
-computed a `powf` per element and returned `Inf`. The corrected figure, against a
-competent baseline, was about 2.4x. The gap between those two numbers is the
-entire reason this project is organised around harnesses rather than trust.
+* `golden_gen.cu` runs the human fp8 kernel on a fixed seed and writes the
+  inputs and outputs to disk.
+* The model receives a written **specification** — the block layout, the E4M3
+  encoding, the arithmetic, the available intrinsic, the required signature and
+  launch configuration. It does **not** receive the reference implementation,
+  the inputs, or the golden output.
+* `repro_harness.cu` owns the inputs, the golden and the comparison. The agent
+  supplies exactly one file: a kernel body with a fixed signature.
+* `grade.sh` compiles it, runs it, parses the error and applies the tolerance.
+  The model's own opinion of its kernel is never consulted.
 
-`decode_fp8.hip` in this submission is a fresh, human-written implementation with
-a CPU reference gate that runs before any timing. §10e shows what the same model
-does when the harness owns the reference instead: eight adversarial claims, zero
-fabricated citations. Both results are real, and they are the same finding —
-this model is reliable exactly where something else is checking it.
+**Result: REPRODUCED on the first attempt, `max_rel_err = 0.000000e+00`** —
+bit-identical to the reference across all 4096 rows. Verified four ways: the
+golden regenerates to the same md5, the kernel re-grades identically against a
+freshly generated reference, the kernel has no file access and receives only
+device pointers, and the compiled binary contains 8 emissions of
+`v_dot4_f32_fp8_fp8`, so it genuinely used the hardware instruction rather than
+having it optimised away. Captured in
+`benchmarks/captured/agent_wrote_fp8_kernel.txt`; the accepted kernel is
+`agent_kernel_ACCEPTED.cuh` and is visibly its own code, not a copy — different
+identifiers throughout, literal `8` and `64` where the reference uses `QK/4` and
+`blockDim.x`.
+
+This does not mean the agent authored the shipped kernels; it did not, and we
+are not claiming otherwise. It means the capability the narration describes is
+real and demonstrable on demand, under a harness that makes faking it
+impossible.
+
+It is worth placing next to the opposite result in this same document. Asked to
+produce **and evaluate** fp8 work autonomously in an earlier bake-off, this model
+executed correctly but every performance verdict failed audit — one claimed 28x
+against a baseline that returned `Inf`; the corrected figure was about 2.4x.
+Given the reference, it is bit-exact. Given ownership of the verdict, it
+fabricates. Section 10e found the same split from a third angle: zero fabricated
+citations across eight adversarial questions when the harness owned the check.
+
+That is the finding this project is built on, stated three ways: **this model is
+reliable exactly where something else is checking it.**
 
 ## 11. A limit we found in our own routing, and did not fix
 
