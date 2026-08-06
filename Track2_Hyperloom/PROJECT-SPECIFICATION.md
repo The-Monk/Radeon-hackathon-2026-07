@@ -726,14 +726,26 @@ inputs, the golden reference and the verdict. Each rig is self-tested in both
 directions before the model sees it — a known-good kernel must reproduce, and a
 deliberately broken one must fail.
 
-| format | encoding | verdict | max abs err | normalised | time |
-|---|---|---|---|---|---|
-| **Q1_0** | 1-bit binary, {-1,+1} | REPRODUCED | 0 | **0** | 122s |
-| **Q2_0** | 2-bit ternary, {-1,0,+1} | REPRODUCED | 7.15e-07 | **1.08e-06** | 148s |
-| **Q4_0** | 4-bit linear, nibble-8 | REPRODUCED | 1.43e-06 | **1.04e-06** | 76s |
-| **Q8_0** | 8-bit signed | REPRODUCED | 0 | **0** | 72s |
+| format | encoding | verdict | error | time |
+|---|---|---|---|---|
+| **Q1_0** | 1-bit binary, {-1,+1} | REPRODUCED | **0** | 122s |
+| **Q2_0** | 2-bit ternary, {-1,0,+1} | REPRODUCED | 1.08e-06 | 148s |
+| **Q4_0** | 4-bit linear, nibble-8 | REPRODUCED | 1.04e-06 | 76s |
+| **Q5_0** | 5-bit linear, nibble + qh bit-plane | REPRODUCED | **0** | 230s |
+| **Q8_0** | 8-bit signed | REPRODUCED | **0** | 72s |
+| **MXFP4** | 4-bit MX: OCP E2M1 leaf + UE8M0 scale | REPRODUCED | 7.31e-07 | 107s |
+| **MXFP8** | 8-bit MX: OCP E4M3 leaf + UE8M0 scale | **NOT REPRODUCED** | **2.087** | 356s |
 
-Q1_0 and Q8_0 are bit-exact. Q2_0 and Q4_0 differ only in fp32 rounding, because
+**Six of seven.** MXFP8 failed after three attempts with an error of 2.087 — that
+is a wrong answer, not a rounding difference, and we are reporting it rather than
+dropping the row. It is the most interesting result in the table precisely
+because it failed: the model had already produced a correct **E4M3** kernel
+(§10f, bit-exact) and a correct **UE8M0-scaled** kernel (MXFP4, above). MXFP8 is
+those two things combined, and the combination is what it could not assemble
+from a specification. Capability on the parts did not compose into capability on
+the whole.
+
+Q1_0, Q5_0 and Q8_0 are bit-exact. Q2_0 and Q4_0 differ only in fp32 rounding, because
 the model chose a different summation order than the reference — which is a
 legitimate implementation choice, not an error.
 
@@ -756,9 +768,8 @@ Had we not looked, a correct kernel would have been recorded as marginal, and a
 slightly unluckier seed would have failed it outright. **A tolerance that passes
 is not evidence that the metric is sound.**
 
-Formats not yet covered: Q5_0, the K-quant superblock family (Q3_K/Q4_K/Q5_K/Q6_K,
-256 elements with multi-level scales), the MX formats (E8M0 shared exponent), and
-2:4 structured sparsity — which needs a different rig entirely, since it is a
+Formats not yet covered: MXFP6, the K-quant superblock family (Q3_K/Q4_K/Q5_K/Q6_K,
+256 elements with multi-level scales), and 2:4 structured sparsity — which needs a different rig entirely, since it is a
 SWMMAC prefill path with metadata rather than a decode GEMV. The rig extends in
 roughly twenty lines per linear format; the superblock and sparse families need
 real specification work rather than a copy.
