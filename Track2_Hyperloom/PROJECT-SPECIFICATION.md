@@ -454,10 +454,13 @@ the Radeon GPU in every case; the cloud is a fallback for stalls, never the
 primary path.
 
 The code reads `RADEON_CLOUD_API_BASE` / `_KEY` / `_MODEL` and is ready to
-configure. **We are not claiming the optional bonus points**, for a specific
-reason worth stating plainly: the Token Factory that issues keys for the free
-shared model API is hosted on `developer.amd.com.cn`, which these rules
+configure. **We are not claiming the optional bonus points**, because we were
+unable to obtain a working key before the deadline. The Token Factory named in
+the platform guide is hosted on `developer.amd.com.cn`, which the contest rules
 designate as the AMD Developer Program portal *"only for developers in Mainland
-China"*. As a US participant we are not eligible for that portal, so the
-escalation path could not be tested against the live service. We will not
-present an untested path as a working one.
+China"*; the global platform also offers model APIs, but was unavailable for
+maintenance during the window we had. Neither of those is a criticism of the
+platform -- timing simply did not work out.
+
+What matters for judging is that the path is untested against the live service,
+and an untested path will not be presented here as a working one.
