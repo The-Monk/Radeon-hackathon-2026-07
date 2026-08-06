@@ -454,6 +454,19 @@ It is a fork of [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
 belongs upstream. None of this is upstreamed and none of it carries any
 endorsement from the llama.cpp maintainers.
 
+That work is also packaged as a runnable appliance, with the resulting fp8
+models published rather than merely described:
+
+  **https://github.com/The-Monk/The-Rock8** — rootless-Podman appliance on the
+  TheRock ROCm 7.13 toolchain, plus five native fp8 E4M3 GGUFs on Hugging Face
+  (Quacken-8B / R1-14B / 27B / 35B-A3B / Ornith-35B), each Quark-quantized from
+  BF16 and validated on gfx1201.
+
+We cite it because published weights are checkable in a way a benchmark table in
+a PDF is not — anyone can download one and run it. The numbers quoted in that
+repository are its own; the claims made in *this* document are the ones backed
+by the code in this repository.
+
 Two things there are worth more than the speedups. The first is a plain
 correctness fix: `GGML_TYPE_Q2_0` was missing from `ggml_validate_row_data`,
 which silently broke `llama-quantize --type Q2_0` and `--check-tensors` for
