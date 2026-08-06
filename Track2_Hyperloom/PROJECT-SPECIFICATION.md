@@ -455,6 +455,13 @@ cross the line into "above roofline", but a claim of exactly *100%* would be an
 artefact of denominator choice, which is why the tables say 96-100% and the
 INVALID flag triggers on the working set rather than on a percentage.
 
+The tool that produces this figure is `benchmarks/bw_roofline.cu`, and its
+captured output is in `benchmarks/captured/bw_roofline.txt`. On the run captured
+there it reports **633 GB/s**, not the 631 we grade against — a 0.3% run-to-run
+difference. We have left the grading denominator at 631 rather than restating
+every percentage in this document, and note the discrepancy here instead. It
+moves nothing: 626/633 is 98.9% rather than 99.2%.
+
 ### Running this on different silicon
 
 `ROOFLINE_GBS` is an environment variable, not a constant, in both the kernels and
