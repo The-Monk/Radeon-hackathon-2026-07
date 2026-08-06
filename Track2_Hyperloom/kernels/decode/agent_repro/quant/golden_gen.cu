@@ -15,8 +15,15 @@ __global__ void golden_kernel(const block_lowbit* __restrict__ w, const float* _
     for (int64_t c = tid; c < Kb; c += blockDim.x) {
         float s = 0.0f;
         for (int k = 0; k < QK_LOWBIT; ++k)
+            #if defined(HAS_QH)
+            { const int hb = (wr[c].qh[k/8] >> (k%8)) & 1;
+              const int j  = k % 16;
+              const int lo = (k < 16) ? (wr[c].qs[j] & 0x0F) : (wr[c].qs[j] >> 4);
+              s += (float)((lo | (hb << 4)) - 16) * act[c * QK_LOWBIT + k]; }
+#else
             s += lowbit_value(wr[c].qs, k) * act[c * QK_LOWBIT + k];
-        partial += s * __half2float(wr[c].d);
+#endif
+        partial += s * block_scale(wr[c]);
     }
     extern __shared__ float sd[]; sd[tid] = partial; __syncthreads();
     for (int s = blockDim.x/2; s > 0; s >>= 1) { if (tid < s) sd[tid] += sd[tid+s]; __syncthreads(); }
@@ -30,7 +37,13 @@ int main() {
     std::uniform_real_distribution<float> af(-1.f,1.f);
     std::vector<block_lowbit> hW((size_t)N*Kb);
     std::vector<float> hA((size_t)Kb*QK_LOWBIT);
-    for (auto& b : hW) { b.d = __float2half(0.02f); for (auto& q : b.qs) q = (uint8_t)byte_(rng); }
+    for (auto& b : hW) {
+        set_block_scale(b);
+        for (auto& q : b.qs) q = (qs_t)byte_(rng);
+#if defined(HAS_QH)
+        for (auto& h : b.qh) h = (uint8_t)byte_(rng);
+#endif
+    }
     for (auto& a : hA) a = af(rng);
 
     block_lowbit* dW; float *dA, *dO;
