@@ -242,7 +242,7 @@ most of the engineering went.
 | Area | Work |
 |---|---|
 | **Decode** | `k_mmvq_dot8_iu4` — native `v_dot8_i32_iu4`, one block per row, coalesced K-stride, shared-memory reduction |
-| **Prefill routing** | Per-format hipBLASLt routes for Q1_0, Q2_0, Q4_K, Q8_0, F8E4M3, MXFP8, MXFP6, IU4, F16 — each opt-in, each soft-failing back to the stock kernel, each gated on a measured M threshold |
+| **Prefill routing** | Per-format hipBLASLt routes for Q1_0, Q2_0, Q4_K, Q8_0, F8E4M3, MXFP8, MXFP6, IU4, F16 — each opt-in, each soft-failing back to the stock kernel, each gated on a measured M threshold. **These routes live in our llama.cpp fork, not in this repository**; what is reproducible here are the standalone kernels under `kernels/`. |
 | **Comms** | INT6 inline-compressed all-reduce for the dual-GPU tensor-parallel path |
 | **Sparsity** | int4 2:4-sparse SWMMAC GEMM (`v_swmmac_i32_16x16x64_iu4`) |
 
@@ -413,6 +413,33 @@ time, and a human caught it both times. The interface now catches it.
 Radeon card) from a written specification, and both interlocks were present in
 its first output. The per-metric gate linkage in rule 1 was underspecified by us
 and corrected by hand afterwards. `harness/README.md` records that split.
+
+## 10b. fp8: the gate that should have been there from the start
+
+`kernels/decode/decode_fp8.hip` is the fp8 (E4M3) decode kernel, built on
+`v_dot4_f32_fp8_fp8` — a native 4-wide fp8 dot product that our ISA sweep found
+present on gfx1201 and unexploited (`results/gfx1201-isa-map.md`).
+
+    correctness gate (vs CPU E4M3 reference)
+      N=256 K=4096   max_rel_err = 2.658e-05   tol = 1e-03   PASS
+
+    throughput vs 631 GB/s measured DRAM roofline
+      N=65536  K=4096   |  272.0 MiB (DRAM-honest)     |  630 GB/s | 100% of roofline
+      N=16384  K=14336  |  238.0 MiB (DRAM-honest)     |  629 GB/s | 100% of roofline
+      N=14336  K=4096   |   59.5 MiB (CACHE-RESIDENT!) | 1504 GB/s | 238%  <-- INVALID
+
+It is included here for a reason beyond the number. The version of this
+benchmark we had been carrying **had no correctness gate at all** — it printed
+627 GB/s and nothing else. Worse, it seeded its weights with uniform random
+bytes, and two of the 256 possible E4M3 encodings (`0x7F`, `0xFF`) are NaN. It
+may well have been timing a kernel whose output was NaN, and no part of its
+output would have revealed that.
+
+The gate above is what caught it, the generator now rejects the NaN encodings,
+and the correctness check runs *before* any throughput line is printed — if it
+fails the program exits without reporting a number. The measured result turned
+out to be sound. That was luck, not method, and the method is what we are
+submitting.
 
 ## 11. A limit we found in our own routing, and did not fix
 
