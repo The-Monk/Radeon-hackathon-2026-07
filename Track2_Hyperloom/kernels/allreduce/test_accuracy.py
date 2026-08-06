@@ -2,11 +2,14 @@
 T188 -- MEASURED numpy accuracy/exact-reduce gate for the INT6 all-reduce codec.
 CPU-only. Run: conda activate inference && python3 test_accuracy.py
 """
-import numpy as np
+import os, numpy as np
 from int6_codec import (
     QK, pack, unpack, round_trip, quantize_codes, dequantize_codes,
     bytes_per_element,
 )
+
+def _need(var, what):
+    raise SystemExit(f"set {var} to {what}")
 
 
 def rel_l2(a, b):
@@ -192,7 +195,7 @@ def test_exact_reduce_independent_scale(bits=6, n=8192, seed=0):
 if __name__ == "__main__":
     g_rows = test_gaussian()
     real_rows = test_real_tensor(
-        "/aipool/models/qwen3.6-27b-dflash-draft-f16.gguf", n_tensors=4)
+        os.environ.get("GGUF") or _need("GGUF", "an f16 GGUF file"), n_tensors=4)
     test_exact_reduce_shared_scale(bits=6)
     test_exact_reduce_shared_scale(bits=4)
     test_exact_reduce_shared_scale(bits=8)

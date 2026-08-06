@@ -13,7 +13,15 @@ This isn't a demo agent. Hyperloom already produced **multiple correctness-clean
 | **Comms** | INT6 inline-compressed all-reduce (dual-GPU tensor-parallel) | exact-integer reduce (~5e-7 drift), ~2.5× compression, bypasses the RCCL gfx1201 tuning gap |
 | **Serving** | auto-tuned continuous batching (`auto-batch-serve.sh`: KV-bounded sweep → throughput-knee detection → cached per model) | **18.4× aggregate decode throughput** at 256 streams vs single-stream on 8B Q2_0 (2853 vs 155 t/s) — still rising when llama.cpp's 256-sequence cap stopped the sweep, so the GPU did not saturate. Aggregate, not per-request — see spec §9 |
 
-Every number is reproduced from source in `benchmarks/`, on real gfx1201 hardware, gated against a CPU reference before it was trusted.
+Each number above has its reproduction in `benchmarks/` — decode, prefill and comms as
+standalone gated benchmarks, serving via `benchmarks/auto-batch-serve.sh` (which needs a
+build of the [fork](https://github.com/The-Monk/llama.cpp/tree/roc8), since continuous
+batching only exists inside a real server). All were measured on real gfx1201 hardware and
+gated against a CPU reference before being trusted.
+
+> The prefill figure is **3.669×** (`benchmarks/README.md` §2). The demo video shows a live
+> re-run landing at 3.583× — the same kernel on a different run. We are leaving both visible
+> rather than re-recording to match, because run-to-run variance is the honest picture.
 
 ---
 
@@ -46,7 +54,7 @@ demo/          Watch the agent optimize a kernel end-to-end, live
 ## Practical value beyond the demo
 
 - **Installable.** Hyperloom is packaged as an [Agent Skill](skill/SKILL.md) in AMD's own `amd/skills` standard — it passes `validate_skills.py` with zero errors. Any compatible coding agent can load it and optimize a Radeon kernel. It maps directly to AMD's planned `hyperloom-kernel-optimizer` catalog slot.
-- **Real ecosystem contribution.** While building this, Hyperloom's method surfaced a genuine RDNA4 gap in AMD's own kernel-evaluation tool and filed it upstream with a fix: **AMD-AGI/Magpie#70** (compare-mode perf ranking weights CDNA metrics that read zero on RDNA4).
+- **Real ecosystem contribution.** While building this, Hyperloom's method surfaced a genuine RDNA4 gap in AMD's own kernel-evaluation tool and reported it upstream: **AMD-AGI/Magpie#70** (an open *issue*, not a merged fix) (compare-mode perf ranking weights CDNA metrics that read zero on RDNA4).
 - **Honest about limits.** Where the silicon has a real floor (e.g. a fixed ~2.7% sparsity-decode cost that survives every software lever), Hyperloom reports the number and stops — no inflated claims.
 
 ## Reproduce it

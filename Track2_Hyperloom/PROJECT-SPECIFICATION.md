@@ -93,7 +93,12 @@ inference never leaves the card; assistance is advisory and must earn its way in
 **1. Silicon-accurate ISA mapping.** `toolkit/scan-isa-gfx.sh` probes the target with `llvm-mc`
 and classifies every candidate instruction as REAL / EMULATED / REJECTED. Marketing claims and
 header definitions both lie; the assembler does not. A 351-builtin sweep on gfx1201 found 54 real,
-and three genuinely unexploited: `v_dot8_i32_iu4`, `v_dot2_f32_f16`, `v_dot4_f32_fp8`.
+and three that stock llama.cpp never emitted: `v_dot8_i32_iu4`, `v_dot2_f32_f16`,
+`v_dot4_f32_fp8`. They are no longer unused, and the census in
+`results/roc9-unused-isa-sweep.md` shows why — it was taken *after* this work, and
+counts them at 4, 125,666 and 110 emissions respectively, all from kernels added
+here. The two that remain genuinely unemitted on that census are
+`v_swmmac_i32_16x16x64_iu4` and `v_dot2_f32_bf16`.
 
 **2. Correctness before speed, without exception.** Every kernel is gated bit-exact against a CPU
 reference *before* any timing is reported. A fast-but-wrong kernel exits non-zero. In the prefill
@@ -164,7 +169,7 @@ reproducible from a clean clone of the public repository, on the card.
 | Stage | Optimization | Measured result |
 |---|---|---|
 | **Decode** | `k_mmvq_dot8_iu4` — native `v_dot8_i32_iu4`, one block per row, coalesced K-stride, shared-memory reduction | **604–613 GB/s = 96–97% of the measured 631 GB/s DRAM roofline.** Memory-bound and saturating. `max_rel_err=1.1e-04` PASS |
-| **Prefill** | int4 2:4-sparse SWMMAC (`v_swmmac_i32_16x16x64_iu4`) full GEMM | **3.67× vs int8 K16 WMMA at K=8192** (90.5 vs 25.0 TOP/s) — 88–95% of the 3.90× raw-instruction ISA ceiling. All correctness gates `max_abs_err=0` |
+| **Prefill** | int4 2:4-sparse SWMMAC (`v_swmmac_i32_16x16x64_iu4`) full GEMM | **3.67× vs int8 K16 WMMA at K=8192** (91.6 vs 25.0 TOP/s, `benchmarks/README.md` §2) — 88–95% of the 3.90× raw-instruction ISA ceiling. All correctness gates `max_abs_err=0` |
 | **Comms** | INT6 inline-compressed all-reduce, shared scale | **2.46× payload reduction vs fp16**, mean `rel_l2 = 0.0239`, routing around the RCCL gfx1201 tuning gap |
 
 **On the decode number specifically.** The naive route — one thread per row — looks 2.2× faster
@@ -188,6 +193,22 @@ gfx1201) and AMD-AGI/Magpie **#70**.
 - **Not dependent on a closed-source agent platform.** The mission loop, tools, memory and
   escalation logic are in this repository (`agent/`).
 - **All tooling is ROCm-native** — hipcc, llvm-mc, rocprof/metrix, Magpie.
+
+**On "Radeon cloud".** The platform clause reads *"Must run on AMD Radeon GPU of
+Radeon cloud + ROCm software stack"*, while the same track's task description asks
+for a *"fully locally deployed"* agent and the clause immediately after it requires
+that *"core inference processes shall be executed locally on AMD Radeon GPU; remote
+APIs are not allowed for core functions."* We read the cloud reference as *where to
+obtain a Radeon GPU* rather than a requirement that the GPU be rented, since the
+alternative reading contradicts the two clauses around it.
+
+This work runs on locally-owned AMD Radeon AI PRO R9700 hardware (2x, gfx1201,
+RDNA4) with ROCm. If the intent was that entries must execute on Radeon Cloud
+specifically, we have not met that clause and would rather say so plainly here than
+have a judge discover it. We would note that RDNA4 kernel work of this kind requires
+the target silicon: the fp8 and int4 dot instructions used throughout
+(`v_dot4_f32_fp8_fp8`, `v_dot8_i32_iu4`) do not exist on RDNA3, so the results are
+only obtainable on gfx1201.
 
 ---
 
@@ -414,11 +435,32 @@ Radeon card) from a written specification, and both interlocks were present in
 its first output. The per-metric gate linkage in rule 1 was underspecified by us
 and corrected by hand afterwards. `harness/README.md` records that split.
 
+> **Provenance for this section.** These figures come from
+> `benchmarks/auto-batch-serve.sh` (shipped here) driving `llama-batched-bench`
+> from a build of the fork; continuous batching does not exist outside a running
+> server, so this is the one result in the document that cannot be reproduced from
+> a standalone kernel in this repository. There is **no correctness gate** on it —
+> it is a throughput measurement of an already-validated engine, not a new kernel.
+> Treat it accordingly.
+
+## 10a. Which roofline number, and why
+
+Throughput here is graded against **631 GB/s**, the streaming DRAM read figure we
+measured with `bw_roofline.cu`. Other numbers appear in this repository and are
+not typos: 598-614 GB/s is the copy/mul/add/triad band, 631-638 the read/dot band,
+and 640 is the vendor spec figure. We grade reads against the read figure. It
+matters because it is a denominator: at 631 the fp8 result below is 99.8% of
+roofline; against 638 it is 98.7%; against the spec 640 it is 98.4%. None of those
+cross the line into "above roofline", but a claim of exactly *100%* would be an
+artefact of denominator choice, which is why the tables say 96-100% and the
+INVALID flag triggers on the working set rather than on a percentage.
+
 ## 10b. fp8: the gate that should have been there from the start
 
 `kernels/decode/decode_fp8.hip` is the fp8 (E4M3) decode kernel, built on
-`v_dot4_f32_fp8_fp8` — a native 4-wide fp8 dot product that our ISA sweep found
-present on gfx1201 and unexploited (`results/gfx1201-isa-map.md`).
+`v_dot4_f32_fp8_fp8` — a native 4-wide fp8 dot product that our ISA sweep found present on gfx1201
+and unused by stock llama.cpp (`results/gfx1201-isa-map.md`). It is used now —
+`results/roc9-unused-isa-sweep.md` counts 110 emissions, from this work.
 
     correctness gate (vs CPU E4M3 reference)
       N=256 K=4096   max_rel_err = 2.658e-05   tol = 1e-03   PASS
@@ -427,6 +469,11 @@ present on gfx1201 and unexploited (`results/gfx1201-isa-map.md`).
       N=65536  K=4096   |  272.0 MiB (DRAM-honest)     |  630 GB/s | 100% of roofline
       N=16384  K=14336  |  238.0 MiB (DRAM-honest)     |  629 GB/s | 100% of roofline
       N=14336  K=4096   |   59.5 MiB (CACHE-RESIDENT!) | 1504 GB/s | 238%  <-- INVALID
+
+(The last line comes from a second invocation, `./decode_fp8 14336 4096` — the
+program prints its two default shapes, or one shape given on the command line.
+They are shown together because the contrast is the point, not because one run
+produced all three.)
 
 It is included here for a reason beyond the number. The version of this
 benchmark we had been carrying **had no correctness gate at all** — it printed
@@ -474,6 +521,15 @@ every Q2_0 GGUF. We audited the rest of the table; Q2_0 was the only gap. The
 second is that **every added route is opt-in and env-gated, defaulting to the
 stock kernel** — for the reason measured in §11.
 
+## 10d. A note on branch names in the captured output
+
+Several captured benchmark files name **`roc9`** (e.g. `build-roc9-714`), because
+that was the research branch the measurements were taken on. `roc9` was promoted
+into **`roc8`** by fast-forward, and `roc8` is the branch that is public. A
+reviewer following a `roc9` path in an output file will not find that branch —
+use `roc8`, which contains the same commits. We have left the captured output
+unedited rather than rewriting recorded filenames after the fact.
+
 ## 11. A limit we found in our own routing, and did not fix
 
 The hipBLASLt prefill routes are gated on M (the batch dimension) against a
@@ -488,7 +544,12 @@ the same route, at the same M values, against two models of different width.
 | 512 | 4077 → 5396 (+32.3%)     | 1381 → 1603 (+16.1%) |
 
 Same route, same threshold, opposite outcomes: **+32.7% on the 8B and -38.2% on
-the 24B**, both with tight error bars (±78/±6.5 and ±3.3/±1.1 respectively). The
+the 24B**. Those two rows have tight spreads (±78/±6.5 and ±3.3/±1.1), and they
+are the two the argument rests on. **The ubatch-512 row does not**: its spreads
+are ±651/±1017 (8B) and ±79/±126 (24B), so OFF and ON overlap and the +32.3% and
++16.1% there are inside the noise — read them as directional only. Every figure
+is n=2 (`crossover.sh` runs `-r 2`), so "±" is a two-sample spread, not a
+confidence interval. The
 8B wins at every M we measured, so its crossover is below 64; the 24B is hurt
 badly until roughly 256. The crossover moves at least 4x with model shape.
 

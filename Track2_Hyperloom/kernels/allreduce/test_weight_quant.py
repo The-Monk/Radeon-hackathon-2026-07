@@ -9,7 +9,7 @@ here. This is pure dynamic-range/precision competition: int6 (fp16 scale,
 linear/uniform code spacing) vs e3m2 (e8m0 scale, float/log-ish code
 spacing, heavier tail headroom). INT4 included as the low anchor.
 """
-import glob
+import os, glob
 import json
 import mmap
 import struct
@@ -73,7 +73,10 @@ def cosine_sim(a, b):
     return float(np.dot(a, b) / (na * nb))
 
 
-MODEL_DIR = "/aipool/models/ornith-1.0-35b-hf-bf16"
+MODEL_DIR = os.environ.get("MODEL_DIR", "")
+if not MODEL_DIR:
+    raise SystemExit("set MODEL_DIR to a BF16 HF model directory, e.g. "
+                     "MODEL_DIR=/path/to/model python test_weight_quant.py")
 
 TARGET_TENSORS = [
     # standard attention (layer 3 -- the hybrid model's full-attn layers)

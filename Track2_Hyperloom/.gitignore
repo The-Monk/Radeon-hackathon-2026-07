@@ -38,3 +38,7 @@ demo/self-narrated/.narr-*/
 __pycache__/
 *.pyc
 kernels/decode/decode_mmvq_iu4
+
+.concat*.txt
+demo/self-narrated/drive-*/
+demo/self-narrated/.narr-*/

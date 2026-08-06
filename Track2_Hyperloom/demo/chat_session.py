@@ -17,7 +17,7 @@ Tools the agent may call:
               which route is used
   run_bench   build and run a correctness-gated benchmark on the GPU
 """
-import json, subprocess, sys, textwrap, time, urllib.request
+import os, json, subprocess, sys, textwrap, time, urllib.request
 from pathlib import Path
 
 URL   = "http://localhost:13305/v1/chat/completions"
@@ -86,8 +86,11 @@ def do_tool(name, args):
         safe = ",".join(x for x in (g.strip() for g in grid.split(",")) if x.isdigit() and 1 <= int(x) <= 256)
         if not safe:
             return "no valid stream counts; llama.cpp allows 1..256 (n_seq_max)"
-        model = "/aipool/models/ternary-bonsai-phase0/Ternary-Bonsai-8B-Q2_0.gguf"
-        bin_ = "/ml/wcache-fix-build/bin/llama-batched-bench"
+        model = os.environ.get("SWEEP_MODEL", "")
+        bin_  = os.environ.get("BATCHED_BENCH", "")
+        if not model or not bin_:
+            return ("sweep_batch needs SWEEP_MODEL (a GGUF) and BATCHED_BENCH "
+                    "(path to llama-batched-bench). Unset here, so no sweep was run.")
         out = sh(f"HIP_VISIBLE_DEVICES=0 {bin_} -m {model} -c 131072 -b 2048 -ub 512 "
                  f"-npp 32 -ntg 128 -npl {safe} -ngl 99 2>/dev/null | grep -E '^\\|' | tail -20", timeout=3600)
         if not out:
