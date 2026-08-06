@@ -48,34 +48,74 @@ struct block_f8e4m3 { __half  d;  uint8_t qs[QK]; };
 struct block_a_fp8  { __half2 ds; uint8_t qs[QK]; };
 
 // ---------------------------------------------------------------- device ---
-__global__ void decode_fp8_dot4(const char* __restrict__ vw,
-                                const block_a_fp8* __restrict__ act,
-                                float* __restrict__ dst,
-                                int64_t Kb, int64_t stride)
-{
-    const int64_t row = blockIdx.x;
-    const int     tid = threadIdx.x;
-    float partial = 0.0f;
+// THIS KERNEL WAS WRITTEN BY THE LOCAL MODEL, not by a human.
+//
+// Qwen-AgentWorld-35B-A3B, served by Lemonade on the R9700, produced it from a
+// written specification: the block layout, the E4M3 encoding, the arithmetic,
+// the available intrinsic, and the required signature. It was given neither a
+// reference implementation nor the expected outputs.
+//
+// It is here because it earned the place. Graded blind against a golden
+// reference it never saw, it came back max_rel_err = 0.000000e+00 -- bit-exact
+// across 4096 rows -- on the first attempt, and the compiled binary contains 8
+// emissions of v_dot4_f32_fp8_fp8, so it really uses the hardware instruction.
+// The rig that established that is in agent_repro/ and can be re-run.
+//
+// The division of labour is worth being exact about: the model wrote the kernel
+// below. The human wrote everything around it -- the CPU E4M3 reference, the
+// correctness gate that runs before any timing, the working-set accounting and
+// the roofline check. Neither half is the interesting one on its own.
+//
+// One honest note on quality: it hardcodes the block width (`c += 64`) and the
+// reduction start (`stride_sh = 32`) where a human would more likely write
+// blockDim.x and blockDim.x/2. That is correct for the launch configuration it
+// was given and specified against, but it is less general than it could be. We
+// have left it exactly as written rather than tidying it, because a kernel that
+// has been quietly edited is no longer evidence of anything.
 
-    const block_f8e4m3* wrow = (const block_f8e4m3*)(vw + row * stride);
-    for (int64_t c = tid; c < Kb; c += blockDim.x) {
-        const uint32_t* wq = (const uint32_t*)wrow[c].qs;   // 8 x u32 = 32 fp8 weights
-        const uint32_t* aq = (const uint32_t*)act[c].qs;    // 8 x u32 = 32 fp8 acts
-        float sumf = 0.0f;
-        #pragma unroll
-        for (int i = 0; i < QK / 4; ++i)
-            sumf = __builtin_amdgcn_dot4_f32_fp8_fp8(wq[i], aq[i], sumf);
-        partial += sumf * __half2float(wrow[c].d) * __low2float(act[c].ds);
+__global__ void decode_fp8_dot4(const char* __restrict__ vw,
+                             const block_a_fp8* __restrict__ act,
+                             float* __restrict__ dst,
+                             int64_t Kb, int64_t stride) {
+    extern __shared__ float sd[];
+    int tid = threadIdx.x;
+    int row = blockIdx.x;
+
+    float thread_sum = 0.0f;
+
+    const block_f8e4m3* row_weights = (const block_f8e4m3*)(vw + row * stride);
+
+    for (int64_t c = tid; c < Kb; c += 64) {
+        const block_f8e4m3* wblk = &row_weights[c];
+        const block_a_fp8* ablk = &act[c];
+
+        const uint32_t* wq = (const uint32_t*)wblk->qs;
+        const uint32_t* aq = (const uint32_t*)ablk->qs;
+
+        float s = 0.0f;
+        for (int i = 0; i < 8; ++i) {
+            s = __builtin_amdgcn_dot4_f32_fp8_fp8(wq[i], aq[i], s);
+        }
+
+        float scale_w = __half2float(wblk->d);
+        float scale_a = __low2float(ablk->ds);
+
+        thread_sum += s * scale_w * scale_a;
     }
 
-    extern __shared__ float sd[];
-    sd[tid] = partial;
+    sd[tid] = thread_sum;
     __syncthreads();
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s) sd[tid] += sd[tid + s];
+
+    for (int stride_sh = 32; stride_sh > 0; stride_sh >>= 1) {
+        if (tid < stride_sh) {
+            sd[tid] += sd[tid + stride_sh];
+        }
         __syncthreads();
     }
-    if (tid == 0) dst[row] = sd[0];
+
+    if (tid == 0) {
+        dst[row] = sd[0];
+    }
 }
 
 // ------------------------------------------------------------------- host ---

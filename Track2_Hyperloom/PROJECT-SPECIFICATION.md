@@ -485,7 +485,9 @@ and it reports what a given target actually has.
 
 ## 10b. fp8: the gate that should have been there from the start
 
-`kernels/decode/decode_fp8.hip` is the fp8 (E4M3) decode kernel, built on
+`kernels/decode/decode_fp8.hip` is the fp8 (E4M3) decode kernel. **The kernel
+itself was written by the local model** and verified bit-exact before being put
+here — see §10f. It is built on
 `v_dot4_f32_fp8_fp8` — a native 4-wide fp8 dot product that our ISA sweep found present on gfx1201
 and unused by stock llama.cpp (`results/gfx1201-isa-map.md`). It is used now —
 `results/roc9-unused-isa-sweep.md` counts 110 emissions, from this work.
@@ -636,10 +638,26 @@ having it optimised away. Captured in
 identifiers throughout, literal `8` and `64` where the reference uses `QK/4` and
 `blockDim.x`.
 
-This does not mean the agent authored the shipped kernels; it did not, and we
-are not claiming otherwise. It means the capability the narration describes is
-real and demonstrable on demand, under a harness that makes faking it
-impossible.
+**That kernel is now the one that ships.** Having been graded bit-exact against
+the human implementation, there was no honest reason to keep it in a side
+experiment while a human-written equivalent occupied the production file, so
+`decode_fp8.hip` now carries the model's kernel with its provenance in the header
+comment. It passes the same gate it always did — `max_rel_err = 2.658e-05` — at
+627 and 629 GB/s.
+
+The division of labour is exact and worth stating rather than blurring: **the
+model wrote the kernel; the human wrote the harness around it** — the CPU E4M3
+reference, the gate that runs before any timing, the working-set accounting, the
+roofline check. Neither half is the interesting one alone.
+
+We left one flaw in place. The model's kernel hardcodes the block width (`c += 64`)
+and the reduction start (`stride_sh = 32`) where a human would more likely write
+`blockDim.x`. That is correct for the launch configuration it was specified
+against, but less general than it should be. Tidying it would have made it a
+jointly-written kernel and destroyed its value as evidence, so it stands as
+written.
+
+The other kernels in `kernels/` remain human-written.
 
 It is worth placing next to the opposite result in this same document. Asked to
 produce **and evaluate** fp8 work autonomously in an earlier bake-off, this model
