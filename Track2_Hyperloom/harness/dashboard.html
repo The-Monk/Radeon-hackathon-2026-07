@@ -154,6 +154,7 @@
         <div id="memory-list"></div>
     </div>
 <script>
+        const CACHE_MIB = 64;   // gfx1201 Infinity Cache, MiB
     function renderDashboard(data) {
         renderPipeline(data);
         renderGates(data.gates || []);
@@ -214,7 +215,9 @@
                 const value = m.value != null ? m.value : 0;
                 if (value > roofline) {
                     valueHtml = `<span class="metric-value metric-red">${m.value} ${m.unit}</span>`;
-                    statusHtml = `<span class="metric-status status-invalid">INVALID (CACHE-RESIDENT)</span>`;
+                    statusHtml = ((m.working_set_mib != null && m.working_set_mib < CACHE_MIB)
+                        ? `<span class="metric-status status-invalid">INVALID (CACHE-RESIDENT)</span>`
+                        : `<span class="metric-status status-invalid">INVALID (ABOVE ROOFLINE — cause unknown)</span>`);
                 } else {
                     const pct = ((value / roofline) * 100).toFixed(1);
                     valueHtml = `<span class="metric-value metric-green">${m.value} ${m.unit} (${pct}%)</span>`;
