@@ -466,9 +466,15 @@ and unused by stock llama.cpp (`results/gfx1201-isa-map.md`). It is used now —
       N=256 K=4096   max_rel_err = 2.658e-05   tol = 1e-03   PASS
 
     throughput vs 631 GB/s measured DRAM roofline
-      N=65536  K=4096   |  272.0 MiB (DRAM-honest)     |  630 GB/s | 100% of roofline
+      N=65536  K=4096   |  272.0 MiB (DRAM-honest)     |  626 GB/s |  99% of roofline
       N=16384  K=14336  |  238.0 MiB (DRAM-honest)     |  629 GB/s | 100% of roofline
-      N=14336  K=4096   |   59.5 MiB (CACHE-RESIDENT!) | 1504 GB/s | 238%  <-- INVALID
+      N=14336  K=4096   |   59.5 MiB (CACHE-RESIDENT!) | 1505 GB/s | 239%  <-- INVALID
+
+Verbatim in `benchmarks/captured/decode_fp8.txt`, including the shell invocations
+and toolchain version. An earlier draft of this section quoted 630 GB/s for the
+first shape from memory; the captured run says 626. The difference is run-to-run
+variance of a few GB/s at the top of the bandwidth curve, and the captured file
+is the authority — which is the point of capturing it.
 
 (The last line comes from a second invocation, `./decode_fp8 14336 4096` — the
 program prints its two default shapes, or one shape given on the command line.
