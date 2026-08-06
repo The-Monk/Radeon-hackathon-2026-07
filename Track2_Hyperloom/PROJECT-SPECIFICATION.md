@@ -597,6 +597,34 @@ consistent with our earlier finding that the difference between useful and
 useless agent output is the harness rather than the model — this is the same
 result observed from the positive direction.
 
+## 10f. Who wrote the kernels
+
+Worth stating plainly, because the surrounding text describes an agent with a
+mission loop that ends in FIX and VALIDATE, and a reader could reasonably infer
+more than we are claiming.
+
+**The kernels in `kernels/` were written by a human**, with AI assistance of the
+ordinary kind. They were not autonomously produced by the local agent in this
+repository. What the agent genuinely does, and what the video shows, is the
+*investigative* half of that loop: detect the hardware, census the ISA with
+`llvm-mc`, locate a gap, run a correctness-gated benchmark, and refuse a number
+that fails its gate.
+
+We are specific about this because we have measured the difference. In an earlier
+bake-off we asked this model to produce and evaluate fp8 kernel work
+autonomously. Its raw execution was sound — it built and ran things correctly —
+but **every performance verdict failed independent audit**, six runs, a different
+way each time. The fp8 attempt reported a 28x speedup against a baseline that
+computed a `powf` per element and returned `Inf`. The corrected figure, against a
+competent baseline, was about 2.4x. The gap between those two numbers is the
+entire reason this project is organised around harnesses rather than trust.
+
+`decode_fp8.hip` in this submission is a fresh, human-written implementation with
+a CPU reference gate that runs before any timing. §10e shows what the same model
+does when the harness owns the reference instead: eight adversarial claims, zero
+fabricated citations. Both results are real, and they are the same finding —
+this model is reliable exactly where something else is checking it.
+
 ## 11. A limit we found in our own routing, and did not fix
 
 The hipBLASLt prefill routes are gated on M (the batch dimension) against a
